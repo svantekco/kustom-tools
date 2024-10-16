@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Sample Checkout Page</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        h1 {
+            margin: 0;
+        }
+        /* Simple styling */
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+        }
+        #top-bar {
+            background-color: #f8f8f8;
+            padding: 20px;
+            display: flex;
+            flex-direction: column; /* Stack items vertically on mobile */
+            align-items: flex-start;
+        }
+        #html-snippet-input {
+            width: 100%;
+            max-width: 400px;
+            height: auto;
+            margin-bottom: 10px;
+            box-sizing: border-box; /* Include padding and border in width */
+        }
+        .button-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+        }
+        #load-checkout-button {
+            background-color: #dad2fd; /* Primary button color */
+            color: #000;
+            border: none;
+            padding: 10px 20px;
+            cursor: pointer;
+        }
+        #load-checkout-button:hover {
+            background-color: #aaa2cd;
+        }
+        .additional-buttons button {
+            background-color: #6c757d; /* Secondary button color */
+            color: #fff;
+            border: none;
+            padding: 10px 15px;
+            cursor: pointer;
+        }
+        .additional-buttons button:hover {
+            background-color: #5a6268;
+        }
+        #main-content {
+            padding: 20px;
+        }
+        #my-checkout-container {
+            border: 1px solid #ccc;
+            padding: 10px;
+            min-height: 200px;
+        }
+        /* Responsive adjustments */
+        @media (min-width: 600px) {
+            #top-bar {
+                flex-direction: row; /* Arrange items horizontally on larger screens */
+                align-items: center;
+            }
+            #html-snippet-input {
+                flex: 1; /* Allow textarea to fill available space */
+                margin-right: 10px;
+                margin-bottom: 0;
+            }
+            .button-group {
+                flex-direction: row;
+            }
+        }
+    </style>
+</head>
+<body>
+    
+    
+      <h1><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 316.76" preserveAspectRatio="xMidYMid meet" width="70px" height="70px" style="height: 50px; width: auto; background-color: rgb(235, 254, 83); padding: 10px;">
+        <g id="Layer_1-2" data-name="Layer_1">
+          <g id="Group_1033">
+            <path id="Path_1041" d="M302.9,163.68l80.01-88.99L283.9,0l-86.81,104.22V12.45h-126.83v89.92H0v111.13h70.25v95.9h126.83v-90.84c32.19,25.83,50.23,55.8,57.06,90.84h138.03c-10.72-56.25-39.98-104.66-89.25-145.68l-.03-.04Z"></path>
+          </g>
+        </g>
+      </svg> HTML snippet playground</h1>
+      
+
+    <!-- Top Bar -->
+    <div id="top-bar">
+    
+        <textarea id="html-snippet-input" placeholder="Enter HTML snippet here" rows="5"></textarea>
+        <div class="button-group">
+            <button id="load-checkout-button">Load Checkout</button>
+            <div class="additional-buttons">
+                <button id="suspend-button">suspend()</button>
+                <button id="resume-button">resume()</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content Area -->
+    <div id="main-content">
+        <div id="my-checkout-container">
+            <!-- The HTML snippet will be loaded here -->
+        </div>
+    </div>
+
+    <!-- JavaScript Code -->
+    <script>
+        // Function to get the value of a query parameter by name
+        function getQueryParam(param) {
+            var urlParams = new URLSearchParams(window.location.search);
+            return urlParams.get(param);
+        }
+
+        // Function to get the HTML snippet from the input field and fix escaped characters
+        function getSnippet() {
+            return new Promise(function(resolve, reject) {
+                var htmlSnippet = document.getElementById('html-snippet-input').value;
+                if (htmlSnippet) {
+                    // Convert escaped characters to valid HTML
+                    htmlSnippet = htmlSnippet.replace(/\n/g, '\n')
+                                             .replace(/\"/g, '"')
+                                             .replace(/\\/g, '\\');
+                    resolve(htmlSnippet);
+                } else {
+                    reject('Please enter an HTML snippet.');
+                }
+            });
+        }
+
+        // Function to render the HTML snippet into the container
+        function renderSnippet(htmlSnippet) {
+            var checkoutContainer = document.getElementById('my-checkout-container');
+            checkoutContainer.innerHTML = htmlSnippet;
+            var scriptsTags = checkoutContainer.getElementsByTagName('script');
+            // Necessary to evaluate script tags
+            for (var i = 0; i < scriptsTags.length; i++) {
+                var parentNode = scriptsTags[i].parentNode;
+                var newScriptTag = document.createElement('script');
+                newScriptTag.type = scriptsTags[i].type || 'text/javascript';
+                if (scriptsTags[i].src) {
+                    newScriptTag.src = scriptsTags[i].src;
+                } else {
+                    newScriptTag.text = scriptsTags[i].text;
+                }
+                parentNode.removeChild(scriptsTags[i]);
+                parentNode.appendChild(newScriptTag);
+            }
+        }
+
+        // Error handling function
+        function renderError(error) {
+            alert(error);
+        }
+
+        // Event listener for the "Load Checkout" button
+        document.getElementById('load-checkout-button').addEventListener('click', function() {
+            getSnippet().then(renderSnippet).catch(renderError);
+        });
+
+        // Event listener for the "suspend()" button
+        document.getElementById('suspend-button').addEventListener('click', function() {
+            window._klarnaCheckout(function (api) {
+                api.suspend();
+            });
+        });
+
+        // Event listener for the "resume()" button
+        document.getElementById('resume-button').addEventListener('click', function() {
+            window._klarnaCheckout(function (api) {
+                api.resume();
+            });
+        });
+
+        // Populate the textarea if "html_snippet" query parameter exists
+        window.addEventListener('DOMContentLoaded', function() {
+            var htmlSnippet = getQueryParam('html_snippet');
+            if (htmlSnippet) {
+                document.getElementById('html-snippet-input').value = htmlSnippet;
+            }
+        });
+    </script>
+</body>
+</html>
