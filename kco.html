@@ -179,9 +179,9 @@
 
         // Populate the textarea if "html_snippet" query parameter exists
         window.addEventListener('DOMContentLoaded', function() {
-            alert(window.location.search);
             var htmlSnippet = getQueryParam('html_snippet');
             if (htmlSnippet) {
+                renderSnippet(htmlSnippet);
                 document.getElementById('html-snippet-input').value = htmlSnippet;
             }
         });
