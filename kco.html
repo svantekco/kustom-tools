@@ -178,13 +178,11 @@
         });
 
         // Populate the textarea if "html_snippet" query parameter exists
-        window.addEventListener('DOMContentLoaded', function() {
-            var htmlSnippet = getQueryParam('html_snippet');
-            if (htmlSnippet) {
-                renderSnippet(htmlSnippet);
-                document.getElementById('html-snippet-input').value = htmlSnippet;
-            }
-        });
+        var htmlSnippet = getQueryParam('html_snippet');
+        if (htmlSnippet) {
+            renderSnippet(htmlSnippet);
+            document.getElementById('html-snippet-input').value = htmlSnippet;
+        }
     </script>
 </body>
 </html>
