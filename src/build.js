@@ -25,6 +25,9 @@ for (const file of fs.readdirSync(snippetDir)) {
 
   const bookmarkletUrl = `${repoBase}/static/${file}`;
   const bookmarklet = `javascript:(function(){var s=document.createElement('script');s.setAttribute('type','text/javascript');s.setAttribute('src','${bookmarkletUrl}');document.body.appendChild(s);})();`;
-  const bookmarkletPath = path.join(staticDir, file.replace(/\.js$/, '.bookmarklet.txt'));
+  const bookmarkletPath = path.join(
+    staticDir,
+    file.replace(/\.js$/, '.bookmarklet.txt')
+  );
   fs.writeFileSync(bookmarkletPath, bookmarklet);
 }
