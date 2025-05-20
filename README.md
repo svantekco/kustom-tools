@@ -7,7 +7,7 @@ This repository contains bookmarklets and small static pages used when working w
 All source files are located in the `src` directory. Run the build script to generate the files under `static` which are served by GitHub Pages.
 
 ```bash
-node src/build.js
+npm run build
 ```
 
 The build script copies each snippet to `static` and creates a `*.bookmarklet.txt` file containing a ready to use bookmarklet.
