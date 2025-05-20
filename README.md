@@ -1,28 +1,27 @@
 # Kustom Tools - Useful Snippets for Troubleshooting KCO
 
-This repository contains a collection of useful JavaScript snippets designed to assist with troubleshooting KCO (Kustom Checkout).
+This repository contains bookmarklets and small static pages used when working with Kustom Checkout.
+
+## Building
+
+All source files are located in the `src` directory. Run the build script to generate the files under `static` which are served by GitHub Pages.
+
+```bash
+node src/build.js
+```
+
+The build script copies each snippet to `static` and creates a `*.bookmarklet.txt` file containing a ready to use bookmarklet.
 
 ## Available Snippets
 
 ### Open `html_snippet` in a Separate Page
 
-This snippet opens the `html_snippet` in a separate page to help with testing or troubleshooting.
-
-Bookmarklet:
-```javascript
-javascript:(function(){var script=document.createElement('script');script.src='https://svantekco.github.io/kustom-tools/snippet.js';document.body.appendChild(script);})();
-```
+Loads the `html_snippet` inside the checkout iframe into a new tab. Bookmarklet content can be found in [`static/openCheckoutSnippet.bookmarklet.txt`](static/openCheckoutSnippet.bookmarklet.txt).
 
 ### Get `order_id` / `session_id`
 
-This snippet helps you extract the `order_id` or `session_id` for troubleshooting purposes.
-
-Bookmarklet:
-```javascript
-javascript:(function(){window.s0=document.createElement('script');window.s0.setAttribute('type','text/javascript');window.s0.setAttribute('src','https://bookmarkify.it/bookmarklets/58579/raw');document.getElementsByTagName('body')[0].appendChild(window.s0);})();
-```
+Displays the order ID from the checkout iframe together with links to DataDog. Bookmarklet content can be found in [`static/getOrderId.bookmarklet.txt`](static/getOrderId.bookmarklet.txt).
 
 ## Usage
 
-To use these snippets, simply create a bookmark in your browser with the JavaScript code provided above. When you visit a page related to KCO, click on the bookmark to execute the snippet.
-
+Create a new bookmark in your browser and copy the text from the corresponding `*.bookmarklet.txt` file as the URL. When visiting a page containing the checkout, click the bookmark to execute the snippet.
