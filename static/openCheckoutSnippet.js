@@ -12,7 +12,7 @@ if (typeof openCheckoutSnippet === 'undefined') {
       const config = JSON.parse(decodedSrc);
       const klarnaHtml = generateKlarnaHtml(config);
       const urlSnippet = encodeURIComponent(klarnaHtml);
-      const newWindowUrl = `https://svantekco.github.io/kustom-tools/kco.html?html_snippet=${urlSnippet}`;
+      const newWindowUrl = `https://svantekco.github.io/kustom-tools/static/kco.html?html_snippet=${urlSnippet}`;
       window.open(newWindowUrl, '_blank');
     } catch (e) {
       console.error('Failed to parse iframe src', e);
