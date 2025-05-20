@@ -1,7 +1,15 @@
 {
   "name": "kustom-tools",
   "version": "1.0.0",
+  "description": "Useful snippets for troubleshooting KCO",
+  "license": "MIT",
   "scripts": {
-    "build": "node src/build.js"
+    "build": "node src/build.js",
+    "lint": "eslint --config .eslintrc \"src/**/*.js\"",
+    "format": "prettier --write \"src/**/*.js\""
+  },
+  "devDependencies": {
+    "eslint": "^8.56.0",
+    "prettier": "^3.2.5"
   }
 }
