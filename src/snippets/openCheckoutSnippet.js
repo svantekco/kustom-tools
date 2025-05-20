@@ -1,26 +1,26 @@
 if (typeof openCheckoutSnippet === 'undefined') {
-    function openCheckoutSnippet() {
-        const iframe = document.getElementById('klarna-checkout-iframe');
-        if (!iframe) {
-            console.error('Iframe with id klarna-checkout-iframe not found');
-            return;
-        }
-
-        try {
-            const src = iframe.src;
-            const decodedSrc = decodeURIComponent(src.split('#')[1]);
-            const config = JSON.parse(decodedSrc);
-            const klarnaHtml = generateKlarnaHtml(config);
-            const urlSnippet = encodeURIComponent(klarnaHtml);
-            const newWindowUrl = `https://svantekco.github.io/kustom-tools/kco.html?html_snippet=${urlSnippet}`;
-            window.open(newWindowUrl, '_blank');
-        } catch (e) {
-            console.error('Failed to parse iframe src', e);
-        }
+  function openCheckoutSnippet() {
+    const iframe = document.getElementById('klarna-checkout-iframe');
+    if (!iframe) {
+      console.error('Iframe with id klarna-checkout-iframe not found');
+      return;
     }
 
-    function generateKlarnaHtml(config) {
-        return `
+    try {
+      const src = iframe.src;
+      const decodedSrc = decodeURIComponent(src.split('#')[1]);
+      const config = JSON.parse(decodedSrc);
+      const klarnaHtml = generateKlarnaHtml(config);
+      const urlSnippet = encodeURIComponent(klarnaHtml);
+      const newWindowUrl = `https://svantekco.github.io/kustom-tools/kco.html?html_snippet=${urlSnippet}`;
+      window.open(newWindowUrl, '_blank');
+    } catch (e) {
+      console.error('Failed to parse iframe src', e);
+    }
+  }
+
+  function generateKlarnaHtml(config) {
+    return `
 <div id="klarna-checkout-container" style="overflow: hidden;">
   <div id="klarna-unsupported-page">
   <style type="text/css">
@@ -44,7 +44,7 @@ if (typeof openCheckoutSnippet === 'undefined') {
       IS_IN_CLIENT_ROLLOUT:${config.IS_IN_CLIENT_ROLLOUT},
       LOCALE:'${config.LOCALE}',
       ORDER_STATUS:'${config.ORDER_STATUS}',
-      MERCHANT_NAME:'${config.MERCHANT_NAME.replace(/'/g, "")}',
+      MERCHANT_NAME:'${config.MERCHANT_NAME.replace(/'/g, '')}',
       GUI_OPTIONS:${JSON.stringify(config.GUI_OPTIONS)},
       ALLOW_SEPARATE_SHIPPING_ADDRESS:${config.ALLOW_SEPARATE_SHIPPING_ADDRESS},
       PURCHASE_COUNTRY:'${config.PURCHASE_COUNTRY}',
@@ -80,10 +80,10 @@ if (typeof openCheckoutSnippet === 'undefined') {
 Please <a href="http://enable-javascript.com">enable JavaScript</a>.
   </noscript>
 </div>`;
-    }
+  }
 
-    // Call the function to open the link
-    openCheckoutSnippet();
+  // Call the function to open the link
+  openCheckoutSnippet();
 } else {
-    openCheckoutSnippet();
+  openCheckoutSnippet();
 }
