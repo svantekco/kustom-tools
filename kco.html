@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>Sample Checkout Page</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <style>
         h1 {
             margin: 0;
@@ -12,32 +12,40 @@
         body {
             font-family: Arial, sans-serif;
             margin: 0;
+            line-height: 1.4;
         }
         #top-bar {
             background-color: #f8f8f8;
-            padding: 20px;
+            padding: 20px 10px;
             display: flex;
             flex-direction: column; /* Stack items vertically on mobile */
             align-items: flex-start;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
         }
         #html-snippet-input {
             width: 100%;
-            max-width: 400px;
+            max-width: none;
             height: auto;
             margin-bottom: 10px;
             box-sizing: border-box; /* Include padding and border in width */
+            font-size: 1rem;
         }
         .button-group {
             display: flex;
             flex-wrap: wrap;
             gap: 5px;
+            width: 100%;
         }
         #load-checkout-button {
             background-color: #dad2fd; /* Primary button color */
             color: #000;
             border: none;
-            padding: 10px 20px;
+            padding: 12px 20px;
             cursor: pointer;
+            font-size: 1rem;
+            touch-action: manipulation;
         }
         #load-checkout-button:hover {
             background-color: #aaa2cd;
@@ -46,8 +54,11 @@
             background-color: #6c757d; /* Secondary button color */
             color: #fff;
             border: none;
-            padding: 10px 15px;
+            padding: 12px 15px;
             cursor: pointer;
+            font-size: 1rem;
+            flex: 1 1 100%;
+            touch-action: manipulation;
         }
         .additional-buttons button:hover {
             background-color: #5a6268;
@@ -70,9 +81,15 @@
                 flex: 1; /* Allow textarea to fill available space */
                 margin-right: 10px;
                 margin-bottom: 0;
+                max-width: none;
             }
             .button-group {
                 flex-direction: row;
+                width: auto;
+            }
+            .button-group button,
+            .additional-buttons button {
+                flex: none;
             }
         }
     </style>
@@ -92,7 +109,7 @@
     <!-- Top Bar -->
     <div id="top-bar">
     
-        <textarea id="html-snippet-input" placeholder="Enter HTML snippet here" rows="5"></textarea>
+        <textarea id="html-snippet-input" placeholder="Enter HTML snippet here" rows="5" autocomplete="off" autocapitalize="none" spellcheck="false" autofocus></textarea>
         <div class="button-group">
             <button id="load-checkout-button">Load Checkout</button>
             <div class="additional-buttons">
@@ -161,6 +178,14 @@
         // Event listener for the "Load Checkout" button
         document.getElementById('load-checkout-button').addEventListener('click', function() {
             getSnippet().then(renderSnippet).catch(renderError);
+        });
+
+        // Allow Ctrl+Enter or Cmd+Enter to load checkout from textarea
+        document.getElementById('html-snippet-input').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                e.preventDefault();
+                getSnippet().then(renderSnippet).catch(renderError);
+            }
         });
 
         // Event listener for the "suspend()" button
