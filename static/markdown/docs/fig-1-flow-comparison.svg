@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg viewBox="0 0 760 360" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Vipps Checkout flow vs Kustom Checkout flow">
+  <style>
+    .t { font: 13px system-ui, -apple-system, sans-serif; fill: #1a1a1a; }
+    .h { font: 600 14px system-ui, -apple-system, sans-serif; fill: #1a1a1a; }
+    .s { font: 11px system-ui, -apple-system, sans-serif; fill: #5a5a5a; }
+    .box { fill: #ffffff; stroke: #d0d0d0; stroke-width: 1; rx: 6; }
+    .vipps { fill: #fff5f0; stroke: #ff5b24; stroke-width: 1; rx: 6; }
+    .kustom { fill: #f3f4ff; stroke: #4f46e5; stroke-width: 1; rx: 6; }
+    .arrow { stroke: #999; stroke-width: 1.2; fill: none; marker-end: url(#a); }
+  </style>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#999"/>
+    </marker>
+  </defs>
+
+  <text x="20" y="28" class="h">Vipps Checkout</text>
+  <text x="20" y="46" class="s">Redirect to Vipps-hosted page</text>
+
+  <rect x="20" y="62" width="160" height="40" class="vipps"/>
+  <text x="100" y="80" class="t" text-anchor="middle">Cart on merchant site</text>
+  <text x="100" y="95" class="s" text-anchor="middle">platform checkout page</text>
+
+  <path d="M100,102 L100,120" class="arrow"/>
+
+  <rect x="20" y="120" width="160" height="40" class="vipps"/>
+  <text x="100" y="138" class="t" text-anchor="middle">Create session</text>
+  <text x="100" y="153" class="s" text-anchor="middle">POST /checkout/v3/session</text>
+
+  <path d="M100,160 L100,178" class="arrow"/>
+
+  <rect x="20" y="178" width="160" height="40" class="vipps"/>
+  <text x="100" y="196" class="t" text-anchor="middle">Redirect buyer</text>
+  <text x="100" y="211" class="s" text-anchor="middle">checkoutFrontendUrl</text>
+
+  <path d="M100,218 L100,236" class="arrow"/>
+
+  <rect x="20" y="236" width="160" height="40" class="vipps"/>
+  <text x="100" y="254" class="t" text-anchor="middle">Buyer pays</text>
+  <text x="100" y="269" class="s" text-anchor="middle">in Vipps / MobilePay app</text>
+
+  <path d="M100,276 L100,294" class="arrow"/>
+
+  <rect x="20" y="294" width="160" height="46" class="vipps"/>
+  <text x="100" y="312" class="t" text-anchor="middle">Operate on payment</text>
+  <text x="100" y="327" class="s" text-anchor="middle">ePayment API by reference</text>
+
+  <line x1="220" y1="60" x2="220" y2="340" stroke="#e5e5e5" stroke-width="1" stroke-dasharray="3 3"/>
+
+  <text x="260" y="28" class="h">Kustom Checkout</text>
+  <text x="260" y="46" class="s">Embedded iframe on merchant site</text>
+
+  <rect x="260" y="62" width="180" height="40" class="kustom"/>
+  <text x="350" y="80" class="t" text-anchor="middle">Cart on merchant site</text>
+  <text x="350" y="95" class="s" text-anchor="middle">platform checkout page</text>
+
+  <path d="M350,102 L350,120" class="arrow"/>
+
+  <rect x="260" y="120" width="180" height="40" class="kustom"/>
+  <text x="350" y="138" class="t" text-anchor="middle">Create order</text>
+  <text x="350" y="153" class="s" text-anchor="middle">POST /checkout/v3/orders</text>
+
+  <path d="M350,160 L350,178" class="arrow"/>
+
+  <rect x="260" y="178" width="180" height="40" class="kustom"/>
+  <text x="350" y="196" class="t" text-anchor="middle">Render html_snippet</text>
+  <text x="350" y="211" class="s" text-anchor="middle">iframe inside merchant page</text>
+
+  <path d="M350,218 L350,236" class="arrow"/>
+
+  <rect x="260" y="236" width="180" height="40" class="kustom"/>
+  <text x="350" y="254" class="t" text-anchor="middle">Buyer completes in iframe</text>
+  <text x="350" y="269" class="s" text-anchor="middle">card, BNPL, invoice, wallets</text>
+
+  <path d="M350,276 L350,294" class="arrow"/>
+
+  <rect x="260" y="294" width="180" height="46" class="kustom"/>
+  <text x="350" y="312" class="t" text-anchor="middle">Acknowledge → operate</text>
+  <text x="350" y="327" class="s" text-anchor="middle">Order Management API by order_id</text>
+
+  <rect x="480" y="62" width="260" height="278" fill="#fafafa" stroke="#eaeaea" stroke-width="1" rx="6"/>
+  <text x="495" y="86" class="h">Key shape differences</text>
+  <text x="495" y="112" class="t">• Session is short-lived (~1h);</text>
+  <text x="495" y="128" class="s">  payment lives in ePayment after auth</text>
+  <text x="495" y="150" class="t">• Order is long-lived;</text>
+  <text x="495" y="166" class="s">  same id from checkout to settlement</text>
+  <text x="495" y="188" class="t">• Redirect vs. iframe is the most</text>
+  <text x="495" y="204" class="s">  visible change for buyers</text>
+  <text x="495" y="226" class="t">• Acknowledge step is mandatory</text>
+  <text x="495" y="242" class="s">  before any OM operation in Kustom</text>
+  <text x="495" y="264" class="t">• Vipps reference = your order #;</text>
+  <text x="495" y="280" class="s">  Kustom uses order_id + merchant_reference1</text>
+  <text x="495" y="302" class="t">• Order lines optional in Vipps,</text>
+  <text x="495" y="318" class="s">  required and strictly validated in Kustom</text>
+</svg>

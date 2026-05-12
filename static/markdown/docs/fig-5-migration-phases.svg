@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg viewBox="0 0 760 260" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Migration phases timeline">
+  <style>
+    .t { font: 11px system-ui, -apple-system, sans-serif; fill: #1a1a1a; }
+    .h { font: 600 12px system-ui, -apple-system, sans-serif; fill: #1a1a1a; }
+    .lbl { font: 10px system-ui, -apple-system, sans-serif; fill: #5a5a5a; }
+    .axis { stroke: #c0c0c0; stroke-width: 1; }
+    .vipps-bar { fill: #ff5b24; opacity: 0.85; }
+    .vipps-bar-faded { fill: #ff5b24; opacity: 0.35; }
+    .kustom-bar { fill: #4f46e5; opacity: 0.85; }
+    .kustom-bar-pilot { fill: #4f46e5; opacity: 0.45; }
+    .phase-line { stroke: #d0d0d0; stroke-width: 1; stroke-dasharray: 2 3; }
+  </style>
+
+  <text x="20" y="22" class="h">Migration phases (typical timeline)</text>
+
+  <line x1="120" y1="240" x2="740" y2="240" class="axis"/>
+
+  <line x1="220" y1="50" x2="220" y2="240" class="phase-line"/>
+  <line x1="320" y1="50" x2="320" y2="240" class="phase-line"/>
+  <line x1="420" y1="50" x2="420" y2="240" class="phase-line"/>
+  <line x1="520" y1="50" x2="520" y2="240" class="phase-line"/>
+  <line x1="620" y1="50" x2="620" y2="240" class="phase-line"/>
+
+  <text x="170" y="46" class="lbl" text-anchor="middle">Phase 1</text>
+  <text x="170" y="58" class="lbl" text-anchor="middle">Design</text>
+  <text x="270" y="46" class="lbl" text-anchor="middle">Phase 2</text>
+  <text x="270" y="58" class="lbl" text-anchor="middle">Build</text>
+  <text x="370" y="46" class="lbl" text-anchor="middle">Phase 3</text>
+  <text x="370" y="58" class="lbl" text-anchor="middle">Pilot</text>
+  <text x="470" y="46" class="lbl" text-anchor="middle">Phase 4</text>
+  <text x="470" y="58" class="lbl" text-anchor="middle">Rollout</text>
+  <text x="570" y="46" class="lbl" text-anchor="middle">Phase 5</text>
+  <text x="570" y="58" class="lbl" text-anchor="middle">Subs cutover</text>
+  <text x="680" y="46" class="lbl" text-anchor="middle">Phase 6</text>
+  <text x="680" y="58" class="lbl" text-anchor="middle">Sunset</text>
+
+  <text x="20" y="100" class="t">Vipps Checkout</text>
+  <text x="20" y="114" class="lbl">in production</text>
+  <rect x="120" y="90" width="300" height="22" class="vipps-bar"/>
+  <rect x="420" y="90" width="200" height="22" class="vipps-bar-faded"/>
+  <rect x="620" y="90" width="120" height="22" class="vipps-bar-faded"/>
+  <text x="270" y="106" class="lbl" text-anchor="middle" fill="#fff">default for new orders</text>
+  <text x="520" y="106" class="lbl" text-anchor="middle">legacy traffic only</text>
+  <text x="680" y="106" class="lbl" text-anchor="middle">refunds / wind-down</text>
+
+  <text x="20" y="148" class="t">Kustom Checkout</text>
+  <text x="20" y="162" class="lbl">build → production</text>
+  <rect x="220" y="138" width="100" height="22" class="kustom-bar-pilot"/>
+  <text x="270" y="154" class="lbl" text-anchor="middle" fill="#fff">flagged build</text>
+  <rect x="320" y="138" width="100" height="22" class="kustom-bar-pilot"/>
+  <text x="370" y="154" class="lbl" text-anchor="middle" fill="#fff">pilot merchants</text>
+  <rect x="420" y="138" width="320" height="22" class="kustom-bar"/>
+  <text x="580" y="154" class="lbl" text-anchor="middle" fill="#fff">default for new orders</text>
+
+  <text x="20" y="196" class="t">Recurring</text>
+  <text x="20" y="210" class="lbl">subscriptions</text>
+  <rect x="120" y="186" width="400" height="22" class="vipps-bar"/>
+  <rect x="520" y="186" width="220" height="22" class="vipps-bar-faded"/>
+  <text x="320" y="202" class="lbl" text-anchor="middle" fill="#fff">Vipps agreements (active)</text>
+  <text x="630" y="202" class="lbl" text-anchor="middle">re-consent at renewal</text>
+  <rect x="520" y="210" width="220" height="22" class="kustom-bar"/>
+  <text x="630" y="226" class="lbl" text-anchor="middle" fill="#fff">Kustom tokens for new subscribers</text>
+
+  <text x="120" y="256" class="lbl">start</text>
+  <text x="740" y="256" class="lbl" text-anchor="end">~12 months later</text>
+</svg>

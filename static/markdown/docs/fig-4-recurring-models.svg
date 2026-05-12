@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg viewBox="0 0 760 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Vipps Recurring vs Kustom Customer Token">
+  <style>
+    .t { font: 12px system-ui, -apple-system, sans-serif; fill: #1a1a1a; }
+    .h { font: 600 13px system-ui, -apple-system, sans-serif; fill: #1a1a1a; }
+    .lbl { font: 11px system-ui, -apple-system, sans-serif; fill: #5a5a5a; }
+    .vipps { fill: #fff5f0; stroke: #ff5b24; stroke-width: 1; rx: 6; }
+    .kustom { fill: #f3f4ff; stroke: #4f46e5; stroke-width: 1; rx: 6; }
+    .neutral { fill: #ffffff; stroke: #c0c0c0; stroke-width: 1; rx: 6; }
+    .arrow { stroke: #555; stroke-width: 1.2; fill: none; marker-end: url(#a4); }
+  </style>
+  <defs>
+    <marker id="a4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#555"/>
+    </marker>
+  </defs>
+
+  <text x="20" y="22" class="h">Vipps Recurring — agreement holds the schedule</text>
+
+  <rect x="20" y="36" width="140" height="44" class="vipps"/>
+  <text x="90" y="58" class="t" text-anchor="middle">Buyer accepts</text>
+  <text x="90" y="72" class="lbl" text-anchor="middle">agreement in Vipps app</text>
+
+  <path d="M160,58 L200,58" class="arrow"/>
+
+  <rect x="200" y="36" width="160" height="44" class="vipps"/>
+  <text x="280" y="58" class="t" text-anchor="middle">Agreement</text>
+  <text x="280" y="72" class="lbl" text-anchor="middle">pattern + max amount</text>
+
+  <path d="M360,58 L400,58" class="arrow"/>
+
+  <rect x="400" y="36" width="160" height="44" class="vipps"/>
+  <text x="480" y="58" class="t" text-anchor="middle">Charges</text>
+  <text x="480" y="72" class="lbl" text-anchor="middle">scheduled ≥ 2 days ahead</text>
+
+  <path d="M560,58 L600,58" class="arrow"/>
+
+  <rect x="600" y="36" width="140" height="44" class="vipps"/>
+  <text x="670" y="58" class="t" text-anchor="middle">Vipps processes</text>
+  <text x="670" y="72" class="lbl" text-anchor="middle">on due date</text>
+
+  <text x="20" y="106" class="lbl">Vipps holds the schedule, shows upcoming charges in-app, and applies its own retry policy on failure.</text>
+
+  <line x1="20" y1="130" x2="740" y2="130" stroke="#e5e5e5" stroke-dasharray="3 3"/>
+
+  <text x="20" y="156" class="h">Kustom Customer Token — merchant holds the schedule</text>
+
+  <rect x="20" y="170" width="160" height="44" class="kustom"/>
+  <text x="100" y="192" class="t" text-anchor="middle">First checkout</text>
+  <text x="100" y="206" class="lbl" text-anchor="middle">order with recurring: true</text>
+
+  <path d="M180,192 L220,192" class="arrow"/>
+
+  <rect x="220" y="170" width="160" height="44" class="kustom"/>
+  <text x="300" y="192" class="t" text-anchor="middle">recurring_token</text>
+  <text x="300" y="206" class="lbl" text-anchor="middle">stored by merchant</text>
+
+  <path d="M380,192 L420,192" class="arrow"/>
+
+  <rect x="420" y="170" width="180" height="44" class="neutral"/>
+  <text x="510" y="192" class="t" text-anchor="middle">Merchant schedules</text>
+  <text x="510" y="206" class="lbl" text-anchor="middle">cron, billing engine, etc.</text>
+
+  <path d="M600,192 L640,192" class="arrow"/>
+
+  <rect x="640" y="170" width="100" height="44" class="kustom"/>
+  <text x="690" y="192" class="t" text-anchor="middle">New order</text>
+  <text x="690" y="206" class="lbl" text-anchor="middle">via token</text>
+
+  <text x="20" y="240" class="lbl">Each recurrence creates a new order. The merchant owns scheduling, retry, and any advance-notice messaging.</text>
+  <text x="20" y="260" class="lbl" font-weight="600" fill="#1a1a1a">Migration implication: existing Vipps agreements need buyer re-consent on Kustom to become tokens.</text>
+</svg>

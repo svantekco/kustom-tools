@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg viewBox="0 0 760 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Vipps webhooks vs Kustom push notifications">
+  <style>
+    .t { font: 12px system-ui, -apple-system, sans-serif; fill: #1a1a1a; }
+    .h { font: 600 13px system-ui, -apple-system, sans-serif; fill: #1a1a1a; }
+    .lbl { font: 11px system-ui, -apple-system, sans-serif; fill: #5a5a5a; }
+    .lane { fill: #fafafa; stroke: #eaeaea; rx: 6; }
+    .vipps-box { fill: #fff5f0; stroke: #ff5b24; stroke-width: 1; rx: 4; }
+    .kustom-box { fill: #f3f4ff; stroke: #4f46e5; stroke-width: 1; rx: 4; }
+    .neutral { fill: #ffffff; stroke: #c0c0c0; stroke-width: 1; rx: 4; }
+    .arrow { stroke: #555; stroke-width: 1.2; fill: none; marker-end: url(#a3); }
+    .arrow-d { stroke: #555; stroke-width: 1.2; fill: none; stroke-dasharray: 4 3; marker-end: url(#a3); }
+  </style>
+  <defs>
+    <marker id="a3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#555"/>
+    </marker>
+  </defs>
+
+  <text x="20" y="22" class="h">Vipps — subscription-based webhooks</text>
+  <rect x="20" y="32" width="720" height="120" class="lane"/>
+
+  <rect x="40" y="58" width="120" height="36" class="neutral"/>
+  <text x="100" y="80" class="t" text-anchor="middle">Merchant</text>
+
+  <rect x="600" y="58" width="120" height="36" class="neutral"/>
+  <text x="660" y="80" class="t" text-anchor="middle">Vipps</text>
+
+  <path d="M160,72 L600,72" class="arrow"/>
+  <text x="380" y="64" class="lbl" text-anchor="middle">POST /webhooks/v1/webhooks  (register once per MSN + event type)</text>
+
+  <path d="M600,108 L160,108" class="arrow"/>
+  <text x="380" y="128" class="lbl" text-anchor="middle">POST event  ·  HMAC-signed payload  ·  ordered per payment</text>
+  <text x="380" y="142" class="lbl" text-anchor="middle">e.g. epayments.payment.authorized.v1, .captured.v1, .refunded.v1</text>
+
+  <text x="20" y="182" class="h">Kustom — per-order push URL</text>
+  <rect x="20" y="192" width="720" height="120" class="lane"/>
+
+  <rect x="40" y="218" width="120" height="36" class="neutral"/>
+  <text x="100" y="240" class="t" text-anchor="middle">Merchant</text>
+
+  <rect x="600" y="218" width="120" height="36" class="neutral"/>
+  <text x="660" y="240" class="t" text-anchor="middle">Kustom</text>
+
+  <path d="M160,230 L600,230" class="arrow"/>
+  <text x="380" y="222" class="lbl" text-anchor="middle">POST /checkout/v3/orders  (push URL set per order in merchant_urls.push)</text>
+
+  <path d="M600,268 L160,268" class="arrow"/>
+  <text x="380" y="262" class="lbl" text-anchor="middle">POST push  ·  minimal body (just order_id)  ·  authentic by IP / HMAC-in-URL</text>
+
+  <path d="M160,288 L600,288" class="arrow-d"/>
+  <text x="380" y="302" class="lbl" text-anchor="middle">GET /ordermanagement/v1/orders/{order_id}  ·  handler reads fresh state</text>
+</svg>

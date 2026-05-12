@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg viewBox="0 0 760 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Kustom order lifecycle">
+  <style>
+    .t { font: 12px system-ui, -apple-system, sans-serif; fill: #1a1a1a; }
+    .lbl { font: 11px system-ui, -apple-system, sans-serif; fill: #5a5a5a; }
+    .state { fill: #f3f4ff; stroke: #4f46e5; stroke-width: 1; rx: 6; }
+    .terminal { fill: #ffffff; stroke: #1a1a1a; stroke-width: 1; rx: 6; }
+    .note { fill: #fafafa; stroke: #eaeaea; stroke-width: 1; rx: 6; }
+    .arrow { stroke: #888; stroke-width: 1.2; fill: none; marker-end: url(#a2); }
+    .arrow-d { stroke: #888; stroke-width: 1.2; fill: none; stroke-dasharray: 4 3; marker-end: url(#a2); }
+  </style>
+  <defs>
+    <marker id="a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#888"/>
+    </marker>
+  </defs>
+
+  <rect x="20" y="60" width="170" height="50" class="state"/>
+  <text x="105" y="83" class="t" text-anchor="middle">checkout_incomplete</text>
+  <text x="105" y="100" class="lbl" text-anchor="middle">order created, not yet paid</text>
+
+  <text x="222" y="80" class="lbl" text-anchor="middle">buyer</text>
+  <text x="222" y="94" class="lbl" text-anchor="middle">completes</text>
+  <path d="M190,85 L255,85" class="arrow"/>
+
+  <rect x="255" y="60" width="170" height="50" class="state"/>
+  <text x="340" y="83" class="t" text-anchor="middle">checkout_complete</text>
+  <text x="340" y="100" class="lbl" text-anchor="middle">awaiting acknowledge</text>
+
+  <text x="457" y="80" class="lbl" text-anchor="middle">acknowledge</text>
+  <path d="M425,85 L490,85" class="arrow"/>
+
+  <rect x="490" y="60" width="150" height="50" class="state"/>
+  <text x="565" y="83" class="t" text-anchor="middle">AUTHORIZED</text>
+  <text x="565" y="100" class="lbl" text-anchor="middle">in Order Management</text>
+
+  <path d="M510,110 Q300,150 165,210" class="arrow-d"/>
+  <text x="280" y="172" class="lbl" text-anchor="middle">cancel</text>
+  <rect x="20" y="210" width="170" height="50" class="terminal"/>
+  <text x="105" y="233" class="t" text-anchor="middle">CANCELLED</text>
+  <text x="105" y="250" class="lbl" text-anchor="middle">authorization released</text>
+
+  <path d="M555,110 L380,210" class="arrow"/>
+  <text x="450" y="170" class="lbl" text-anchor="middle">capture (full)</text>
+  <rect x="295" y="210" width="170" height="50" class="terminal"/>
+  <text x="380" y="233" class="t" text-anchor="middle">CAPTURED</text>
+  <text x="380" y="250" class="lbl" text-anchor="middle">funds captured in full</text>
+
+  <path d="M610,110 L660,210" class="arrow"/>
+  <text x="690" y="160" class="lbl" text-anchor="middle">partial</text>
+  <text x="690" y="174" class="lbl" text-anchor="middle">capture</text>
+  <rect x="570" y="210" width="170" height="50" class="state"/>
+  <text x="655" y="233" class="t" text-anchor="middle">PART_CAPTURED</text>
+  <text x="655" y="250" class="lbl" text-anchor="middle">some amount captured</text>
+
+  <path d="M570,235 L465,235" class="arrow"/>
+  <text x="517" y="226" class="lbl" text-anchor="middle">capture rest</text>
+
+  <rect x="20" y="280" width="720" height="32" class="note"/>
+  <text x="36" y="301" class="lbl">Refunds reduce the captured amount but the order remains CAPTURED. Each refund is its own resource in Order Management.</text>
+</svg>

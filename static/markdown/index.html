@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Markdown Viewer</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/github-markdown-css@5.5.1/github-markdown.css" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github.min.css" media="(prefers-color-scheme: light)" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github-dark.min.css" media="(prefers-color-scheme: dark)" />
+<style>
+  :root { color-scheme: light dark; }
+  body {
+    margin: 0;
+    padding: 2rem 1rem;
+    background: Canvas;
+    color: CanvasText;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  }
+  main.markdown-body {
+    box-sizing: border-box;
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 2rem;
+    background: Canvas;
+  }
+  @media (max-width: 767px) {
+    body { padding: 0.5rem; }
+    main.markdown-body { padding: 1rem; }
+  }
+  .status {
+    max-width: 860px;
+    margin: 0 auto 1rem;
+    padding: 0.75rem 1rem;
+    border-radius: 6px;
+    border: 1px solid #d0d7de;
+    background: #f6f8fa;
+    color: #1f2328;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.875rem;
+  }
+  .status.error { border-color: #ffcecb; background: #ffebe9; color: #82071e; }
+  @media (prefers-color-scheme: dark) {
+    .status { background: #161b22; border-color: #30363d; color: #e6edf3; }
+    .status.error { background: #2d0d11; border-color: #f85149; color: #ff8182; }
+  }
+</style>
+</head>
+<body>
+<div id="status" class="status" hidden></div>
+<main id="content" class="markdown-body" hidden></main>
+
+<script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/highlight.min.js"></script>
+<script>
+  const statusEl = document.getElementById('status');
+  const contentEl = document.getElementById('content');
+
+  function showStatus(msg, isError) {
+    statusEl.textContent = msg;
+    statusEl.classList.toggle('error', !!isError);
+    statusEl.hidden = false;
+  }
+
+  function safeFile(name) {
+    // Disallow path traversal and absolute paths; allow simple filenames and nested paths under docs/.
+    if (!name) return null;
+    if (name.includes('..') || name.startsWith('/') || name.includes('\\')) return null;
+    if (!/^[A-Za-z0-9_\-./]+$/.test(name)) return null;
+    return name;
+  }
+
+  marked.setOptions({
+    gfm: true,
+    breaks: false,
+    highlight(code, lang) {
+      try {
+        if (lang && hljs.getLanguage(lang)) {
+          return hljs.highlight(code, { language: lang }).value;
+        }
+        return hljs.highlightAuto(code).value;
+      } catch (_) {
+        return code;
+      }
+    },
+  });
+
+  // Make relative links/images inside the doc resolve against docs/<file>'s directory.
+  function rewriteRelativeUrls(rootEl, baseUrl) {
+    const base = new URL(baseUrl, window.location.href);
+    rootEl.querySelectorAll('a[href]').forEach(a => {
+      const href = a.getAttribute('href');
+      if (!href || /^[a-z]+:|^#|^\/\//i.test(href) || href.startsWith('/')) return;
+      // Rewrite .md links so they open in the viewer.
+      if (/\.md(\?|#|$)/i.test(href)) {
+        const resolved = new URL(href, base);
+        const docsBase = new URL('docs/', window.location.href);
+        if (resolved.href.startsWith(docsBase.href)) {
+          const rel = resolved.href.slice(docsBase.href.length);
+          a.href = `?file=${encodeURIComponent(rel)}`;
+          return;
+        }
+      }
+      a.href = new URL(href, base).href;
+    });
+    rootEl.querySelectorAll('img[src]').forEach(img => {
+      const src = img.getAttribute('src');
+      if (!src || /^[a-z]+:|^\/\//i.test(src) || src.startsWith('/')) return;
+      img.src = new URL(src, base).href;
+    });
+  }
+
+  async function load() {
+    const params = new URLSearchParams(window.location.search);
+    const requested = params.get('file');
+    if (!requested) {
+      showStatus('No file specified. Use ?file=example.md', true);
+      return;
+    }
+    const file = safeFile(requested);
+    if (!file) {
+      showStatus(`Invalid file path: ${requested}`, true);
+      return;
+    }
+    const url = `docs/${file}`;
+    try {
+      const res = await fetch(url, { cache: 'no-cache' });
+      if (!res.ok) {
+        showStatus(`Failed to load ${url} (HTTP ${res.status})`, true);
+        return;
+      }
+      const md = await res.text();
+      const rawHtml = marked.parse(md);
+      const clean = DOMPurify.sanitize(rawHtml);
+      contentEl.innerHTML = clean;
+      rewriteRelativeUrls(contentEl, url);
+      contentEl.hidden = false;
+      statusEl.hidden = true;
+
+      const firstHeading = contentEl.querySelector('h1, h2, h3');
+      document.title = firstHeading ? `${firstHeading.textContent} — Markdown Viewer` : `${file} — Markdown Viewer`;
+    } catch (err) {
+      showStatus(`Error loading ${url}: ${err.message}`, true);
+    }
+  }
+
+  load();
+</script>
+</body>
+</html>
