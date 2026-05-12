@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg viewBox="0 0 760 380" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Vipps vs Kustom authentication request shape">
+  <style>
+    .t { font: 13px system-ui, -apple-system, sans-serif; fill: #1a1a1a; }
+    .h { font: 600 14px system-ui, -apple-system, sans-serif; fill: #1a1a1a; }
+    .s { font: 11px system-ui, -apple-system, sans-serif; fill: #5a5a5a; }
+    .code { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; fill: #1a1a1a; }
+    .code-dim { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; fill: #888; }
+    .vipps { fill: #fff5f0; stroke: #ff5b24; stroke-width: 1; rx: 6; }
+    .kustom { fill: #f3f4ff; stroke: #4f46e5; stroke-width: 1; rx: 6; }
+    .extra { fill: #fff; stroke: #ff5b24; stroke-width: 1; stroke-dasharray: 3 3; rx: 6; }
+    .arrow { stroke: #ff5b24; stroke-width: 1.2; fill: none; marker-end: url(#av); }
+  </style>
+  <defs>
+    <marker id="av" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#ff5b24"/>
+    </marker>
+  </defs>
+
+  <text x="20" y="28" class="h">Vipps</text>
+  <text x="20" y="46" class="s">OAuth2 bearer + subscription key + MSN header</text>
+
+  <rect x="20" y="62" width="340" height="180" class="vipps"/>
+  <text x="34" y="84" class="code">POST /epayment/v1/payments HTTP/1.1</text>
+  <text x="34" y="108" class="code">Authorization: Bearer eyJhbGc...</text>
+  <text x="34" y="128" class="code">Ocp-Apim-Subscription-Key: 9c2e...</text>
+  <text x="34" y="148" class="code">Merchant-Serial-Number: 123456</text>
+  <text x="34" y="168" class="code">Idempotency-Key: 8d3b-...</text>
+  <text x="34" y="188" class="code">Content-Type: application/json</text>
+  <text x="34" y="216" class="code-dim">{ "amount": { ... }, "reference": ... }</text>
+
+  <rect x="20" y="262" width="340" height="98" class="extra"/>
+  <text x="34" y="284" class="h">Token lifecycle</text>
+  <text x="34" y="306" class="s">• POST /accesstoken/get with client creds</text>
+  <text x="34" y="322" class="s">• Returns bearer valid 1h (test) / 24h (prod)</text>
+  <text x="34" y="338" class="s">• Cache + refresh; each MSN has its own creds</text>
+  <text x="34" y="354" class="s">• Subscription key issued once per environment</text>
+
+  <line x1="380" y1="60" x2="380" y2="360" stroke="#e5e5e5" stroke-width="1" stroke-dasharray="3 3"/>
+
+  <text x="400" y="28" class="h">Kustom</text>
+  <text x="400" y="46" class="s">HTTP Basic Auth — one header, no token exchange</text>
+
+  <rect x="400" y="62" width="340" height="180" class="kustom"/>
+  <text x="414" y="84" class="code">POST /ordermanagement/v1/orders HTTP/1.1</text>
+  <text x="414" y="108" class="code">Authorization: Basic TTEyMzQ1Njpz...</text>
+  <text x="414" y="128" class="code-dim">                ↑ base64(MID:secret)</text>
+  <text x="414" y="158" class="code">Content-Type: application/json</text>
+  <text x="414" y="186" class="code-dim">{ "purchase_country": "SE", ... }</text>
+
+  <rect x="400" y="262" width="340" height="98" fill="#fff" stroke="#4f46e5" stroke-width="1" stroke-dasharray="3 3" rx="6"/>
+  <text x="414" y="284" class="h">Credential lifecycle</text>
+  <text x="414" y="306" class="s">• One credential pair per MID</text>
+  <text x="414" y="322" class="s">• Same pair across Checkout, OM, Token, Settle</text>
+  <text x="414" y="338" class="s">• No token fetch, no refresh, no expiry</text>
+  <text x="414" y="354" class="s">• Multi-market handled inside the order body</text>
+</svg>

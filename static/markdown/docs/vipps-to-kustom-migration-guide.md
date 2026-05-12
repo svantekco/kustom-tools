@@ -1,11 +1,12 @@
 # Migrating from Vipps Checkout to Kustom Checkout
 
-This guide is for platform partners and integration engineers who already have a Vipps Checkout integration and need to add a Kustom Checkout integration alongside it. It walks through the conceptual model of each product, where they overlap, where they differ, and how to plan the migration.
+This guide is for platform partners and integration engineers who already have a Vipps Checkout integration and need to add Kustom Checkout alongside it. It walks through the conceptual model of each product, where they differ, and how to plan the migration.
 
 For exact request and response details, refer to the linked API reference pages in each section.
 
 On this page
 
+- [Cheat sheet](#cheat-sheet)
 - [Overview](#overview)
 - [Core concepts](#core-concepts)
 - [Before you get started](#before-you-get-started)
@@ -14,21 +15,36 @@ On this page
 - [Settlements and reconciliation](#settlements-and-reconciliation)
 - [Migration approach](#migration-approach)
 - [Special use cases](#special-use-cases)
+- [Migration gotchas](#migration-gotchas)
 - [Appendix](#appendix)
+
+---
+
+## Cheat sheet
+
+| Concept | Vipps Checkout | Kustom Checkout |
+|---|---|---|
+| Merchant identity | Merchant Serial Number (MSN), one per sales unit | Merchant ID (MID), one per merchant, multi-market |
+| Auth | OAuth2 bearer + subscription key + MSN header | HTTP Basic Auth |
+| Checkout primitive | Short-lived session (~1h), then payment resource | Persistent order with single `order_id` |
+| Primary key | Merchant-supplied `reference` | Kustom-generated `order_id` (+ `merchant_reference1`) |
+| UI surface | Redirect to Vipps-hosted page | Inline iframe on merchant page (redirect fallback available) |
+| Order management API | ePayment API | Order Management API |
+| State propagation | Signed webhooks for every transition | Synchronous response + push-to-refetch |
+| Recurring | Agreement + scheduled charges | Customer token + merchant-driven replay |
+| Settlement key | `reference` | `merchant_reference1` |
 
 ---
 
 ## Overview
 
-Vipps MobilePay has sold the Vipps Checkout product to Kustom, and existing Vipps Checkout merchants are being migrated to Kustom Checkout. As a platform partner, your role is to integrate Kustom Checkout in your platform so that merchants can move over with as little disruption as possible.
+Vipps MobilePay has sold the Vipps Checkout product to Kustom, and existing Vipps Checkout merchants are being migrated to Kustom Checkout. As a platform partner, your role is to integrate Kustom Checkout so that merchants can move over with as little disruption as possible.
 
-Vipps Checkout is a wallet-led, redirect-style checkout. The buyer is redirected to a Vipps-hosted page and authenticates with Vipps or MobilePay. The merchant integration is relatively narrow: a session is created server-to-server, the buyer is redirected, and after authorization the merchant operates on a payment resource through the ePayment API.
+Vipps Checkout is a wallet-led, redirect-style checkout: a session is created server-to-server, the buyer is redirected to a Vipps-hosted page, and after authorization the merchant operates on a payment via the ePayment API.
 
-Kustom Checkout is a multi-method, embedded checkout. Kustom renders the checkout UI inside an iframe on the merchant's own checkout page and supports card, invoice, BNPL, direct debit, Apple Pay, Google Pay, and Vipps/MobilePay as payment options within the same flow. The merchant integration is broader: it covers checkout, order management, customer tokens for subscriptions, and settlements.
+Kustom Checkout is a multi-method, embedded checkout. Kustom renders the UI inside an iframe on the merchant's checkout page and supports card, invoice, BNPL, direct debit, Apple Pay, Google Pay, and Vipps/MobilePay as payment options within the same flow.
 
-The two products share the same lifecycle (create checkout, authorize, capture, refund or cancel, reconcile against payouts), but they differ in how that lifecycle is modeled, identified, and exposed. The rest of this guide covers those differences.
-
-The two flows at a glance:
+The two products share the same lifecycle — create, authorize, capture, refund or cancel, reconcile — but differ in how that lifecycle is modeled, identified, and exposed.
 
 ![Vipps Checkout vs Kustom Checkout flow](fig-1-flow-comparison.svg)
 
@@ -36,337 +52,188 @@ The two flows at a glance:
 
 ## Core concepts
 
-### Checkout primitive
-
-Vipps Checkout uses a short-lived **session**, typically valid for around an hour. After the buyer authorizes the payment, the session is no longer used; the durable object is a **payment** in the ePayment API, identified by the merchant-supplied reference.
-
-Kustom Checkout uses a single **order** that persists across the entire lifecycle, identified by a single `order_id` from creation through settlement. The same id is used by two different APIs depending on where the order is in its life:
-
-- **Checkout API** — used while the buyer is still in the iframe. The order is in `checkout_incomplete` until the buyer authorises, then moves to `checkout_complete`.
-- **Order Management API** — used after the order has been placed. The order continues through `AUTHORIZED`, `CAPTURED`, `PART_CAPTURED`, `CANCELLED`, and so on.
-
-After the buyer completes the iframe and the order moves to `checkout_complete`, the merchant **acknowledges** the order. Acknowledge is not strictly required for the Order Management endpoints to work — all OM calls succeed against an unacknowledged order — but it is strongly recommended. Its purpose is to confirm that the merchant is aware of the order. A buyer can complete payment in Kustom but then never reach the merchant's confirmation page (network drop, closed tab, app switch), and because most platforms only create the local order record when the confirmation page is rendered, the merchant might otherwise miss it entirely. Acknowledge plus the push fallback close that gap.
-
-The Kustom order lifecycle in one picture:
+| Concept | Vipps | Kustom |
+|---|---|---|
+| Checkout primitive | Short-lived **session** (~1h). After authorization, the durable object is a **payment** in the ePayment API. | Single **order** that persists from creation through settlement, identified by `order_id`. Two APIs (Checkout, Order Management) share the same id. |
+| Status transitions | Session → authorized payment | `checkout_incomplete` → `checkout_complete` → `AUTHORIZED` → `CAPTURED` / `PART_CAPTURED` / `CANCELLED` |
+| Identifier | Merchant-supplied `reference`, used everywhere | Kustom-generated `order_id` for API calls; `merchant_reference1` for settlements |
+| Amounts | Minor units; line items used for display, validated by amount | Minor units; line items required and must reconcile exactly to order total including tax |
 
 ![Kustom order lifecycle](fig-2-order-lifecycle.svg)
 
-For more information, see the [Kustom Checkout overview](https://docs.kustom.co/contents/checkout) and the [Order Management introduction](https://docs.kustom.co/contents/order-management).
+**Acknowledge** is unique to Kustom. After the iframe completes, the merchant should `POST /ordermanagement/v1/orders/{order_id}/acknowledge` to confirm awareness of the order. Order Management calls work without it, but acknowledge plus the push fallback closes the gap when a buyer pays in Kustom but never reaches the merchant's confirmation page (network drop, closed tab, app switch).
 
-### Identifiers
+**Identifier mapping** — keep a stable, indexed table mapping Kustom `order_id` ↔ Vipps `reference` ↔ your internal order number from the start.
 
-In Vipps, the merchant supplies a `reference` when creating the session. This reference is the primary key for every subsequent operation, webhook, and settlement entry. You can use your own internal order number end-to-end.
+![Identifier flow across the lifecycle](fig-8-identifier-flow.svg)
 
-In Kustom, the system generates an `order_id` when the order is created. Your internal order number rides along as `merchant_reference1` (and optionally `merchant_reference2`). Both identifiers travel through the order's life, but Kustom-side API calls key on the Kustom `order_id`, while settlement reports key on `merchant_reference1`.
+**Line-item reconciliation** is the most common source of onboarding friction. Kustom requires each line to declare quantity, unit price, tax rate, total amount, and total tax, and the sum must reconcile exactly to the order total in minor units. Discounts are expressed as line items. This discipline also flows into Order Management, where captures and refunds work best when line references are supplied.
 
-You will want a stable, indexed mapping table between the two identifiers and your internal order number from the start.
-
-### Line items, tax, and amounts
-
-Both APIs use minor units for all amounts (øre, øre, cents). No floating-point money is used in either case.
-
-Vipps Checkout accepts an order summary that is primarily used for display. Validation is amount-based.
-
-Kustom Checkout requires complete order lines for every order. Each line declares a quantity, unit price, tax rate, total amount, and total tax. The sum of the lines must reconcile exactly to the order total, including tax. Discounts are expressed as line items. This strict line-item discipline also flows into Order Management, where captures and refunds work best when line references are supplied.
-
-This is one of the most common sources of friction during onboarding, especially for merchants whose cart layer uses unusual discount or rounding logic.
-
-For details, see [Create an order](https://docs.kustom.co/contents/api/checkout/other/createordermerchant) in the Kustom Checkout API reference.
+References: [Kustom Checkout overview](https://docs.kustom.co/contents/checkout), [Order Management introduction](https://docs.kustom.co/contents/order-management), [Create an order](https://docs.kustom.co/contents/api/checkout/other/createordermerchant).
 
 ---
 
 ## Before you get started
 
-A platform partner needs two operational prerequisites in place for each merchant before any API call can be made: a merchant identity and a working set of credentials. Both differ from Vipps to Kustom.
+### Merchant identity and authentication
 
-### Merchant id
+| | Vipps | Kustom |
+|---|---|---|
+| Identity | Merchant Serial Number (MSN), six-digit numeric, one per sales unit | Merchant ID (MID), format `Mxxxxxx`, one per merchant covering multiple markets |
+| Multi-store / multi-market | One MSN (and credential pair) per store | Single MID; market selected by `purchase_country` + `purchase_currency` on each order |
+| Auth scheme | OAuth2 bearer token + Azure subscription key | HTTP Basic Auth |
+| Headers | `Authorization: Bearer <token>`, `Ocp-Apim-Subscription-Key: <key>`, `Merchant-Serial-Number: <MSN>` | `Authorization: Basic base64(username:shared_secret)` |
+| Token lifetime | 1h test / 24h prod, must be cached and refreshed | None — no token exchange |
+| Credential scope | Per MSN | One credential pair spans Checkout, Order Management, Customer Token, and Settlements APIs |
 
-On Vipps, the merchant identity used in API calls is the **Merchant Serial Number (MSN)**: a numeric identifier (typically six digits) representing a *sales unit*. A single legal entity can hold multiple MSNs, one per store or per market it operates. The MSN is passed on every API call as a header:
+![Authentication request shape comparison](fig-7-auth-comparison.svg)
 
-```
-Merchant-Serial-Number: 123456
-```
+**Implication:** the credential model is simpler on Kustom, but the platform's merchant-configuration UI must make multi-market merchants explicit. Map each existing Vipps MSN to a Kustom MID + market combination during design.
 
-Multi-store merchants therefore typically have multiple sets of Vipps credentials, one set per MSN.
+During parallel running, both auth models must coexist behind a clean abstraction. Once Vipps is retired, the token-cache and subscription-key handling can be removed.
 
-On Kustom, the equivalent identity is the **Merchant ID (MID)**, in the format `Mxxxxxx` (for example `M123456`). A single MID represents a merchant account that can have **multiple markets configured underneath it** — for example one MID covering SE/SEK, NO/NOK, DK/DKK, and FI/EUR. The market used on a given order is selected by the `purchase_country` and `purchase_currency` fields on the create-order call, which must match a market enabled on the MID. The MID itself isn't a header on API calls; it is encoded in the Basic Auth username (see [Authentication](#authentication)).
-
-The implication for platform partners is that the credential model is simpler on Kustom — typically one credential pair per merchant rather than one per sales unit — but the platform needs to know which market on the MID applies to a given checkout, and the platform's merchant-configuration UI should make multi-market merchants explicit. Mapping each existing Vipps MSN to a Kustom MID + market combination is a useful artefact to produce during the design phase.
-
-### Authentication
-
-#### Vipps
-
-Vipps APIs use an OAuth2 bearer access token together with an Azure-style subscription key and the MSN on every request. The access token is obtained from the Access Token API and must be cached and refreshed.
-
-Required headers on a typical Vipps API call:
-
-- `Authorization: Bearer <access_token>`
-- `Ocp-Apim-Subscription-Key: <subscription_key>`
-- `Merchant-Serial-Number: <MSN>`
-
-Tokens are valid for 1 hour in test and 24 hours in production. For more information, see the [Vipps Access Token API](https://developer.vippsmobilepay.com/api/access-token/) and [Vipps API keys](https://developer.vippsmobilepay.com/docs/knowledge-base/api-keys/).
-
-#### Kustom
-
-Kustom APIs use HTTP Basic Auth. The username is derived from the MID and a shared secret completes the pair; both are combined and base64-encoded into the `Authorization` header:
-
-```
-Authorization: Basic base64(username:shared_secret)
-```
-
-The same credentials work across the Checkout API, Order Management API, Customer Token API, and Settlements API. There is no token exchange and no subscription key.
-
-For more information, see [Authentication](https://docs.kustom.co/api/authentication) in the Kustom API documentation.
-
-#### Migration note
-
-During parallel running, both authentication models must coexist behind a clean abstraction in your platform. Once Vipps Checkout is fully retired, the token-cache and subscription-key handling for Vipps Checkout-related APIs can be removed.
+References: [Vipps Access Token API](https://developer.vippsmobilepay.com/api/access-token/), [Vipps API keys](https://developer.vippsmobilepay.com/docs/knowledge-base/api-keys/), [Kustom Authentication](https://docs.kustom.co/api/authentication).
 
 ---
 
 ## Checkout
 
-### Vipps Checkout
+### Flow comparison
 
-The merchant creates a session at `POST /checkout/v3/session` with the order amount, currency, merchant reference, and callback and return URLs. The response includes a `checkoutFrontendUrl`.
+| | Vipps | Kustom (inline) |
+|---|---|---|
+| Create | `POST /checkout/v3/session` | `POST /checkout/v3/orders` |
+| Required input | Amount, currency, merchant reference, callback + return URLs | Country, currency, locale, order lines (reconciling), totals, `merchant_urls` |
+| Response | `checkoutFrontendUrl` | `html_snippet` (HTML + script loader) |
+| UI surface | Buyer redirected to Vipps-hosted page | Snippet injected into checkout page; Kustom renders the form in-iframe |
+| Buyer leaves merchant site? | Yes | No |
+| Abandoned session | Create new session for same reference | Order persists; resume in same iframe |
+| Callbacks | Single `callbackUrl` + `returnUrl` | Per-order `merchant_urls` (see below) |
 
-The buyer is redirected to that URL and pays in the Vipps or MobilePay app or with card. The session is short-lived; if the buyer abandons and returns later, the merchant creates a new session for the same reference. After authorization, the buyer is sent back to the merchant's `returnUrl` and the merchant operates on the payment resource through the ePayment API.
+### Merchant URLs (Kustom)
 
-For more information, see the [Vipps Checkout API guide](https://developer.vippsmobilepay.com/docs/APIs/checkout-api/checkout-api-guide/).
+Kustom communicates with the merchant through per-order callback URLs declared at order creation in `merchant_urls`:
 
-### Kustom Checkout (recommended: inline iframe)
+- `confirmation` — page the buyer is redirected to after the iframe. Primary completion handoff; where the merchant finalises the order.
+- `push` — server-to-server callback when the order reaches `checkout_complete`. Fallback when the buyer doesn't reach the confirmation page.
+- `terms` — merchant's terms and conditions, displayed in the iframe.
+- `checkout` — used by Kustom for back-navigation from the iframe.
+- `validation` (optional) — server-to-server hook called before placing the order, so the merchant can run last-mile checks like inventory.
+- `notification` (optional) — server-to-server callback for non-synchronous outcomes such as fraud review or pending-payment status.
 
-The merchant creates an order at `POST /checkout/v3/orders` with the purchase country, currency, locale, order lines (with per-line tax and total), order totals, and merchant URLs. Line totals must reconcile to the order total in minor units; the order is rejected if they do not.
+Templated placeholders (`{checkout.order.id}`) are substituted by Kustom. Push and notification payloads are minimal — usually just the `order_id` in the URL — and the handler is expected to fetch the latest state from the API rather than trust the body. Authenticity comes from Kustom's published egress IP ranges; an HMAC parameter can be encoded into the URL if cryptographic verification is required.
 
-The response includes an `html_snippet`: an HTML fragment with a container `<div>` and a `<script>` loader. The merchant injects it into a container element on the checkout page, and Kustom takes over the form — payment method selection, address collection, dynamic shipping, validation. The buyer never leaves the merchant's site.
+### Confirmation page handler
 
-The iframe emits JavaScript events the merchant's page can listen for — `shipping_address_change`, `billing_address_change`, `change`, and others — useful when the page needs to react to buyer input (for example, recalculating a shipping quote from a third party).
+![Confirmation page handler with push fallback](fig-6-confirmation-flow.svg)
 
-For more information, see [Create order](https://docs.kustom.co/contents/checkout/integrate-kco-in-your-ecommerce/create-order) and the [Checkout API reference](https://docs.kustom.co/contents/api/checkout).
+After the buyer completes the iframe, Kustom redirects them to the `confirmation` URL with `order_id` substituted in. The handler must:
 
-### Merchant URLs configured at order creation
+1. `GET /checkout/v3/orders/{order_id}` and verify status `checkout_complete`.
+2. Create the local order record.
+3. `POST /ordermanagement/v1/orders/{order_id}/acknowledge`.
+4. Render the confirmation `html_snippet` from the order response.
 
-Kustom communicates with the merchant through a small set of per-order callback URLs declared at order creation in `merchant_urls`. These are the integration points where Kustom calls back to the merchant during and after the checkout flow:
+From step 3 on, the order lives in Order Management. The push handler runs the same logic when the buyer doesn't reach the confirmation page, so the local record is created exactly once either way.
 
-- `confirmation` — the page the buyer is redirected to after completing the iframe. This is the primary completion handoff and where the merchant finalises the order.
-- `push` — server-to-server callback Kustom posts to when the order reaches `checkout_complete`. Fallback for the small fraction of buyers who don't reach the confirmation page (network drop, closed tab, app switch).
-- `terms` — link to the merchant's terms and conditions, displayed in the iframe.
-- `checkout` — the merchant's checkout page itself, used by Kustom for back-navigation from the iframe.
-- `validation` (optional) — server-to-server hook Kustom calls before placing the order so the merchant can run last-mile checks such as inventory and accept or reject by HTTP status.
-- `notification` (optional) — server-to-server callback for outcomes that are not synchronous, such as fraud review or pending-payment status.
+On Vipps, the `returnUrl` is essentially just where the buyer lands; on Kustom, the confirmation page is an active integration point.
 
-Templated placeholders such as `{checkout.order.id}` are substituted into the URLs by Kustom. Push and notification payloads are minimal — usually just the `order_id` in the URL — and the handler is expected to fetch the latest state from the API rather than trust the body. Authenticity is established by Kustom's published egress IP ranges; if a cryptographic guarantee is required, an HMAC parameter can be encoded into the URL and validated by the handler.
+### Hosted Payment Page (HPP)
 
-Vipps Checkout has a much narrower equivalent: a single `callbackUrl` for asynchronous status updates and a `returnUrl` for the buyer redirect. State communication on the Vipps side is centralised in the Webhooks API instead — covered in [Notifications and state communication](#notifications-and-state-communication).
+For platforms whose architecture only supports a redirect-style checkout and cannot embed an inline iframe, Kustom offers the **Hosted Payment Page (HPP)**: Kustom hosts the checkout on its own domain and the buyer is redirected to it, in the same model as Vipps Checkout today. HPP is feature-equivalent for the buyer and unlocks the same set of payment methods, but the embedded experience is the recommended default — HPP is purely the fallback when redirect is structurally required by the platform.
 
-### Finalising the order on the confirmation page
-
-After the buyer completes the iframe, Kustom redirects them to the merchant's `confirmation` URL with the `order_id` substituted in. This page is the primary order-finalisation trigger on the merchant side:
-
-1. The confirmation page handler calls `GET /checkout/v3/orders/{order_id}` and verifies that the status is `checkout_complete`.
-2. The platform creates its local order record.
-3. The platform calls `POST /ordermanagement/v1/orders/{order_id}/acknowledge`.
-4. The platform renders the confirmation `html_snippet` from the order response so the buyer sees the receipt.
-
-From step 3 onwards, the order lives in Order Management and all subsequent capture, refund, and cancel calls go to the Order Management API.
-
-A push fallback (the `push` merchant URL above) runs the same logic for the small fraction of buyers who never reach the confirmation page, so the local order is created exactly once either way.
-
-This is a meaningful difference from the Vipps flow, where the `returnUrl` is essentially just where the buyer lands and the merchant then operates on the ePayment API directly. On Kustom, the confirmation page is an active integration point, not just a landing page.
-
-### Kustom Hosted Payment Page (for redirect-based platforms)
-
-For platforms whose architecture cannot host an iframe — for example certain headless setups, POS terminals, or environments with restrictive CSP — Kustom also offers the **Hosted Payment Page (HPP)**. Kustom hosts the checkout on its own domain and the buyer is redirected to it, in the same model as Vipps Checkout today.
-
-HPP is feature-equivalent for the buyer and unlocks the same set of payment methods, but it loses the in-store experience of the inline iframe. The recommendation for new integrations is to use the inline checkout; HPP is the fallback when redirect is structurally required.
-
-For more information, see the [Hosted Kustom Checkout integration guide](https://docs.kustom.co/contents/checkout/hosted-payment-page/before-you-start/hpp-integration).
+Reference: [Hosted Kustom Checkout integration](https://docs.kustom.co/contents/checkout/hosted-payment-page/before-you-start/hpp-integration).
 
 ### Front-end implications
 
-For an inline integration, the merchant's checkout page template gains a container element for the snippet, optional listeners for the iframe's JS events, a Content Security Policy that permits Kustom's iframe domains and scripts, and a confirmation page that renders the confirmation snippet.
+An inline integration adds: a container element for the snippet, optional listeners for iframe JS events (`shipping_address_change`, `billing_address_change`, `change`), a CSP that permits Kustom's iframe domains and scripts, and a confirmation page that renders the confirmation snippet. None of this exists in Vipps. The natural place is the platform's checkout template, not the payment-method module.
 
-None of this exists in the Vipps Checkout integration. The natural place to put it is the platform's checkout template layer, not the payment-method module.
+References: [Create order](https://docs.kustom.co/contents/checkout/integrate-kco-in-your-ecommerce/create-order), [Checkout API reference](https://docs.kustom.co/contents/api/checkout), [Vipps Checkout API guide](https://developer.vippsmobilepay.com/docs/APIs/checkout-api/checkout-api-guide/).
 
 ---
 
 ## Order management
 
-After authorization, post-checkout operations such as capture, refund, and cancel are handled through dedicated APIs on each side.
+### Operations
 
-### Vipps ePayment API
+| Operation | Vipps ePayment (key: `reference`) | Kustom Order Management (key: `order_id`) |
+|---|---|---|
+| Capture | `POST /epayment/v1/payments/{reference}/capture` | `POST /ordermanagement/v1/orders/{order_id}/captures` |
+| Refund | `POST /epayment/v1/payments/{reference}/refund` | `POST /ordermanagement/v1/orders/{order_id}/refunds` |
+| Cancel | `POST /epayment/v1/payments/{reference}/cancel` | `POST /ordermanagement/v1/orders/{order_id}/cancel` |
+| Get | `GET /epayment/v1/payments/{reference}` | `GET /ordermanagement/v1/orders/{order_id}` |
+| Events / history | `GET /epayment/v1/payments/{reference}/events` | Order read; captures and refunds are addressable sub-resources |
+| Acknowledge | — | `POST /ordermanagement/v1/orders/{order_id}/acknowledge` |
+| Update authorization | — | `PATCH /ordermanagement/v1/orders/{order_id}/authorization` |
+| Update merchant refs | — | `PATCH /ordermanagement/v1/orders/{order_id}/merchant-references` |
+| Add shipping info | — | `POST /ordermanagement/v1/orders/{order_id}/shipping-info` |
+| Partial captures / refunds | Repeated calls with `modificationAmount`; running totals in `aggregate` | Each `POST` creates a sub-resource with its own URL in the `Location` header |
+| Idempotency | `Idempotency-Key` header | Idempotency key supported, strongly recommended |
 
-The Vipps ePayment API exposes a small set of operations on the payment resource, keyed by the merchant `reference`:
+References: [Kustom Capture and Track Orders](https://docs.kustom.co/contents/order-management/manage-orders-with-the-api/capture-and-track-orders), [Refund Orders](https://docs.kustom.co/contents/order-management/manage-orders-with-the-api/refund-and-extend-orders).
 
-- Capture: `POST /epayment/v1/payments/{reference}/capture`
-- Refund: `POST /epayment/v1/payments/{reference}/refund`
-- Cancel: `POST /epayment/v1/payments/{reference}/cancel`
-- Get payment: `GET /epayment/v1/payments/{reference}`
-- Get events: `GET /epayment/v1/payments/{reference}/events`
+### State propagation
 
-Captures, refunds, and cancels accept a `modificationAmount`. Partial captures and partial refunds are supported by repeating the call. The payment response includes an `aggregate` object showing the running totals of authorized, captured, cancelled, and refunded amounts.
-
-Mutations support the `Idempotency-Key` header to make retries safe.
-
-For more information, see [Capture the payment](https://developer.vippsmobilepay.com/docs/APIs/epayment-api/api-guide/operations/capture/) and [Refund the payment](https://developer.vippsmobilepay.com/docs/APIs/epayment-api/api-guide/operations/refund/).
-
-### Kustom Order Management API
-
-The Kustom Order Management API exposes a broader set of operations on the order resource, keyed by `order_id`:
-
-- Acknowledge: `POST /ordermanagement/v1/orders/{order_id}/acknowledge`
-- Capture: `POST /ordermanagement/v1/orders/{order_id}/captures`
-- Refund: `POST /ordermanagement/v1/orders/{order_id}/refunds`
-- Cancel: `POST /ordermanagement/v1/orders/{order_id}/cancel`
-- Get order: `GET /ordermanagement/v1/orders/{order_id}`
-- Update authorization: `PATCH /ordermanagement/v1/orders/{order_id}/authorization`
-- Update merchant references: `PATCH /ordermanagement/v1/orders/{order_id}/merchant-references`
-- Add shipping information: `POST /ordermanagement/v1/orders/{order_id}/shipping-info`
-
-Captures and refunds are themselves resources. Each `POST` creates a sub-resource whose URL is returned in the `Location` header. The order can have many captures and many refunds, each retrievable by id.
-
-For more information, see [Capture and Track Orders](https://docs.kustom.co/contents/order-management/manage-orders-with-the-api/capture-and-track-orders), [Refund Orders](https://docs.kustom.co/contents/order-management/manage-orders-with-the-api/refund-and-extend-orders), and the [Order Management API reference](https://docs.kustom.co/contents/api/order-management).
-
-### Notifications and state communication
-
-How each product communicates state changes back to the merchant follows from where those state changes actually originate:
-
-- On **Vipps**, state changes occur in many places. The buyer authorises in the Vipps or MobilePay app, the merchant captures and refunds through the ePayment API, and Vipps itself transitions payments to expired, terminated, or aborted under certain conditions. Webhooks fan out signed events from all of these stages so the merchant can stay in sync.
-- On **Kustom**, state changes after `checkout_complete` are almost always initiated by the merchant — capture, refund, cancel — and Kustom returns the updated state synchronously in the response to those calls. The merchant therefore already has the latest state without Kustom needing to push it. Kustom only changes state on its own in a few specific cases.
+| | Vipps | Kustom |
+|---|---|---|
+| Mechanism | Signed webhooks per event type | Synchronous API response + minimal push (refetch trigger) |
+| Who drives state? | Buyer, merchant, and Vipps itself (expiry, terminate, abort) | Merchant for capture/refund/cancel; Kustom for auth expiry |
+| Payload | Self-contained signed event | URL with `order_id` — fetch latest state |
+| Registration | `POST /webhooks/v1/webhooks` per MSN; up to 25 per event type | Per-order `push` URL in `merchant_urls` |
+| Delivery | Per-payment ordered queue; failure blocks subsequent events | Best-effort push; first-class webhooks in development |
 
 ![Vipps webhooks vs Kustom push notifications](fig-3-webhooks-vs-push.svg)
 
-#### Vipps Webhooks API
+![State propagation sequence](fig-9-state-propagation.svg)
 
-The Vipps Webhooks API is the primary mechanism for keeping the merchant in sync with the payment across its whole lifecycle. The merchant registers a callback URL and a list of event types once per MSN at `POST /webhooks/v1/webhooks`. The response includes a webhook id and a secret used to verify HMAC signatures on inbound events.
+Vipps event types include `epayments.payment.created.v1`, `authorized.v1`, `captured.v1`, `refunded.v1`, `cancelled.v1`, `expired.v1`, `terminated.v1`, `aborted.v1`.
 
-Events are emitted from every relevant stage of the payment:
+**Auto-cancel on Kustom** — if the authorization window passes without a capture, Kustom releases the reservation and the order moves to cancelled. Today this surfaces when the merchant reads the order; monitor `expires_at` proactively. Card windows are typically weeks; invoice and BNPL can be longer.
 
-- Creation and authorisation: `epayments.payment.created.v1`, `epayments.payment.authorized.v1`.
-- Capture and refund processing: `epayments.payment.captured.v1`, `epayments.payment.refunded.v1`.
-- Terminal states: `epayments.payment.cancelled.v1`, `epayments.payment.expired.v1`, `epayments.payment.terminated.v1`, `epayments.payment.aborted.v1`.
-
-Events are queued per payment and delivered in order; a failed delivery holds subsequent events for the same payment until the first one succeeds. Up to 25 registrations per event type per MSN are supported, which is useful for fan-out to multiple environments.
-
-For more information, see the [Vipps Webhooks API guide](https://developer.vippsmobilepay.com/docs/APIs/webhooks-api/api-guide/), [event types](https://developer.vippsmobilepay.com/docs/APIs/webhooks-api/events/), and [request authentication](https://developer.vippsmobilepay.com/docs/APIs/webhooks-api/request-authentication/).
-
-#### Who drives state changes on Kustom
-
-After `checkout_complete`, the typical pattern on Kustom is:
-
-- The **merchant initiates** the change: capture, refund, partial capture, cancel, or update.
-- **Kustom responds** with the new state of the order in the synchronous API response, including the running totals and any newly created capture or refund sub-resource.
-
-Because the merchant already has the result in hand, there is no need for Kustom to push that state back asynchronously. The merchant simply updates its own record from the response.
-
-The main case where Kustom changes state on its own is **auto-cancel on authorization expiry**. If the authorization window passes without a capture, Kustom releases the reservation and the order moves to a cancelled state. Today this surfaces when the merchant reads the order, so platforms are expected to monitor the `expires_at` field proactively and either capture, extend, or accept the auto-cancel.
-
-#### Webhook support is in development
-
-Kustom is currently building first-class webhook support that will broaden notification coverage to events beyond the per-order push, including server-initiated transitions such as the auto-cancel case above. When designing the handler, plan so that a future webhook-driven event source can feed the same internal pipeline as today's push handler with minimal change.
-
-#### Migration tip
-
-The Kustom push is a notification to refetch state, not an event payload to trust. The Vipps webhook is a self-contained signed event. When migrating, introduce a unified internal event type in your platform — for example `OrderEvent { type, externalId }` — and normalise both sources into it. Downstream domain logic stays unchanged regardless of which provider produced the event, and the same downstream is ready for Kustom's webhook support once it ships.
-
-### Idempotency
-
-Vipps relies on the `Idempotency-Key` header on mutating requests. A retry with the same key produces the same outcome.
-
-Kustom's Order Management API also supports an idempotency key on its mutating endpoints. It is not mandatory, but it is strongly recommended for any production integration — without it, a naive retry of a capture or refund creates a duplicate resource. Recording the intent in your database before the call (keyed by something stable in your domain such as a shipment id or return id) is a useful belt-and-braces approach on top of the API-level idempotency key.
-
-### Authorization lifetime
-
-Both products expose a finite authorization window during which a capture can be performed. The window depends on the payment method and on the agreement with the acquirer. After expiry, the capture call is rejected and a new authorization is required.
-
-Your platform should already track authorization expiry for Vipps. On Kustom, the order resource exposes an `expires_at` field, so the same tracking is straightforward — persist the field on the local order record and run a job that flags orders nearing expiry. Windows vary by payment method: cards typically have a window in the order of weeks, while invoice and BNPL methods can be longer.
+References: [Vipps Webhooks API guide](https://developer.vippsmobilepay.com/docs/APIs/webhooks-api/api-guide/), [event types](https://developer.vippsmobilepay.com/docs/APIs/webhooks-api/events/), [request authentication](https://developer.vippsmobilepay.com/docs/APIs/webhooks-api/request-authentication/).
 
 ---
 
 ## Settlements and reconciliation
 
-Both products produce settlement data, but with different shapes.
+| | Vipps Report API | Kustom Settlements API |
+|---|---|---|
+| Shape | Transaction-level + settlement-level summaries; paginated cursor queries by date range | One settlement report per payout, with order-level rows |
+| Reconciliation key | `reference` | `merchant_reference1` |
+| Drill-down | Payout → individual `reference` values | List payouts, get payout by reference, full payout-with-transactions, flat transactions by date |
+| Adjustments | — | Refunds issued after a payout appear as negative entries in the next payout |
+| Row fields (Kustom) | — | `order_id`, `merchant_reference1`, `merchant_reference2`, type, amount, tax, merchant fee, payment method |
 
-### Vipps Report API
+During parallel running, set `merchant_reference1` to the same value used for the Vipps `reference` so the reconciliation pipeline can share a single key.
 
-The Vipps Report API exposes transaction-level data and settlement-level summaries through paginated cursor queries by date range. The two levels can be drilled between, so a payout can be traced back to its individual `reference` values.
-
-For more information, see the [Vipps Report API quick start](https://developer.vippsmobilepay.com/docs/APIs/report-api/report-api-quick-start/).
-
-### Kustom Settlements API
-
-Kustom produces a settlement report per payout. The reports include order-level transaction rows with `order_id`, `merchant_reference1`, `merchant_reference2`, transaction type (sale, return, refund, commission, and others), amount, tax, merchant fee, and payment method.
-
-Available endpoints include list payouts, get a specific payout by reference, get a full payout-with-transactions report, and list flat transactions for a date range.
-
-Refunds issued after a payout has been generated appear as negative entries in the next payout, so the reconciliation logic must accept negative amounts and out-of-period adjustments.
-
-For more information, see [Settlement reports](https://docs.kustom.co/contents/order-management/settlements/settlement-reports).
-
-### Reconciliation during migration
-
-While both products are running in parallel, both feeds need to be ingested and normalized to a common internal shape. The natural reconciliation key on the Vipps side is the merchant `reference`; on the Kustom side, the equivalent key is `merchant_reference1`. Setting `merchant_reference1` to the same value the platform uses for the Vipps `reference` keeps the reconciliation pipeline simple.
+References: [Vipps Report API](https://developer.vippsmobilepay.com/docs/APIs/report-api/report-api-quick-start/), [Kustom Settlement reports](https://docs.kustom.co/contents/order-management/settlements/settlement-reports).
 
 ---
 
 ## Migration approach
 
-Most platform partners follow a similar phased rollout. The phases below describe a typical engineering shape; the exact timing depends on merchant volume, subscription mix, and the partner's release cadence.
-
 ![Migration phases timeline](fig-5-migration-phases.svg)
 
-### Phase 1: orientation and design
+| Phase | Goal | Key actions |
+|---|---|---|
+| 1. Orient and design | Internalise the differences | Stand up a Kustom playground; walk through one happy-path flow (create → iframe → push → acknowledge → capture → refund); audit the Vipps integration for hidden coupling (reference = internal order number, line totals that don't reconcile, idempotency reliance) |
+| 2. Build behind a flag | Implement as a new module | Acknowledge, line-item reconciliation, push handler (HMAC-in-URL if required), record-then-call idempotency, Order Management admin UI before going live |
+| 3. Pilot | Validate under real volume | Route a subset of new traffic for 1–2 engaged merchants; compare auth rate, capture latency, refund flow, settlement reconciliation, support tickets; iterate on rounding and iframe styling. Do **not** migrate recurring agreements yet |
+| 4. Wider rollout | Default new orders to Kustom | Switch the default across the merchant base; keep Vipps available for unmigrated merchants; bulk of partner communication happens here |
+| 5. Subscription cutover | Move recurring to Kustom tokens | Stop creating new Vipps Recurring agreements; build re-consent at next renewal for existing agreements; replace in-app advance notice with merchant-owned email/SMS if your market requires it |
+| 6. Sunset | Retire Vipps | After 6–12 months (longest refund + auth windows), deregister webhook subscriptions, archive credentials, remove integration code; keep historical Vipps data accessible for accounting and disputes |
 
-Stand up a Kustom playground tenant and walk through one full happy-path flow by hand — create order, render iframe, push, acknowledge, capture, refund. This is the most efficient way for the team to internalize the differences.
-
-Audit the existing Vipps integration for hidden coupling. Common items to look for include code that assumes the merchant reference is also the platform's internal order number, retry logic that relies on `Idempotency-Key`, and cart logic that produces line totals that do not reconcile to the order total in minor units.
-
-Decide where Kustom Checkout fits in the platform's architecture: as a new payment method, or as a new checkout provider. Most partners find the second framing more accurate, because Kustom is itself a checkout layer that contains payment methods.
-
-### Phase 2: build the integration behind a feature flag
-
-Implement the Kustom Checkout integration as a new module rather than a refactor of the Vipps module. Include the acknowledge step, line-item reconciliation, the push handler (with HMAC-in-URL if required), and a record-then-call idempotency strategy from the start. Build the Order Management UI surfaces in the platform's admin (capture, refund, partial capture with tracking) before going live.
-
-### Phase 3: pilot with a small set of merchants
-
-Route a subset of new traffic through Kustom for one or two engaged merchants. Compare authorization rate, capture latency, refund flow, settlement reconciliation, and support tickets side-by-side with Vipps Checkout. Iterate on the rough edges that only show up under real volume, such as line-total rounding and iframe styling.
-
-Do not migrate existing recurring agreements in this phase.
-
-### Phase 4: wider rollout for new orders
-
-Default new orders to Kustom Checkout across the merchant base, while keeping Vipps Checkout available for merchants that have not yet onboarded to Kustom. This is the phase in which the bulk of partner communication takes place — onboarding documentation, merchant-facing migration guides, and positioning.
-
-Vipps Checkout continues to service its existing payments (captures, refunds, settlements) for as long as it remains live in the merchant base.
-
-### Phase 5: subscription cutover
-
-Stop creating new Vipps Recurring agreements; new subscribers go through the Kustom customer-token flow. For existing Vipps agreements, build a re-consent flow that prompts the buyer to complete a Kustom checkout at their next renewal. Expect some attrition.
-
-If advance notice of upcoming charges was load-bearing in your market for the Vipps in-app preview, replace it with an email or SMS notification owned by the merchant.
-
-### Phase 6: sunset
-
-Once the longest refund and authorization windows have elapsed past the last Vipps order (typically six to twelve months), the Vipps webhook subscriptions can be deregistered, the credentials archived, and the Vipps Checkout integration code removed.
-
-Historical Vipps data should remain accessible in the platform's order history. Merchants will need it for accounting and dispute purposes for several years.
+**Architectural framing:** treat Kustom as a new *checkout provider*, not a new *payment method*. Kustom is itself a checkout layer that contains payment methods.
 
 ### What to communicate to merchants
 
-Most of the change is invisible to the buyer, but a few items are not.
+- **Checkout UI changes shape.** Iframe, not redirect — themes, scripts, and third-party tags need revalidation. Buyers stay on the merchant's site.
+- **Subscriptions require re-consent.** Active Vipps Recurring subscribers cannot be silently moved. Communicate this early to subscription-heavy verticals.
+- **Order admin tooling changes underneath.** Underlying API calls change; the admin UI can stay the same if you wrap it.
+- **Line items, tax, and discounts must reconcile.** Merchants with bespoke discount or rounding logic may need cart cleanup.
+- **Settlement reports change.** Provide a side-by-side cheat sheet during the transition.
 
-The checkout UI changes shape. Kustom is an iframe, not a redirect, so merchants who have customised their checkout page (theming, scripts, third-party tags) need to revalidate their setup. Buyers stay on the merchant's site through the whole flow.
-
-Subscriptions require re-consent. Active Vipps Recurring subscribers cannot be silently moved. Communicate this early to subscription-heavy verticals.
-
-Order administration tooling changes underneath. If merchants administer captures and refunds from the platform's admin today, the underlying calls change. The admin UI can stay the same, but the underlying behaviour must be feature-complete before the default is switched.
-
-Line items, tax, and discounts must reconcile. Merchants with bespoke discount logic, custom tax rules, or unusual rounding may need to clean up cart data before Kustom Checkout will accept their orders.
-
-Settlement reports change. Merchants who reconcile manually need a side-by-side cheat sheet during the transition.
-
-A useful framing to lead with: Kustom is a superset rather than a replacement. Vipps and MobilePay remain available as payment methods inside Kustom Checkout, and the checkout experience moves back into the merchant's storefront as an embedded iframe.
+Lead with: **Kustom is a superset, not a replacement.** Vipps and MobilePay remain available inside Kustom Checkout, and the checkout experience moves into the merchant's storefront.
 
 ---
 
@@ -374,145 +241,35 @@ A useful framing to lead with: Kustom is a superset rather than a replacement. V
 
 ### Subscriptions and recurring payments
 
-The two products use different recurring models. They cannot be migrated transparently for existing subscribers.
+The two products use fundamentally different recurring models and cannot be migrated transparently for existing subscribers.
 
 ![Vipps Recurring vs Kustom Customer Token](fig-4-recurring-models.svg)
 
-#### Vipps Recurring API
+| | Vipps Recurring | Kustom Customer Token |
+|---|---|---|
+| Model | Agreement (with `agreementId`) + scheduled charges | Token-and-replay |
+| Setup inside the checkout flow | Create the Checkout session with `type: SUBSCRIPTION` (InitiateSubscriptionSessionRequest); buyer accepts the agreement in Vipps app; response carries `agreementId` | Create the order with `recurring: true` (and optional `recurring_description`); completed order response carries `recurring_token` |
+| Setup outside Checkout | Standalone Recurring API: `POST /recurring/v3/agreements`, redirect buyer to `vippsConfirmationUrl`, poll until `ACTIVE` | n/a — token is always issued by a completed Kustom order |
+| Each billing cycle | Merchant `POST /recurring/v3/agreements/{agreementId}/charges`, at least a couple of days in advance | Merchant `POST /customer-token/v1/tokens/{token}/order`; order created authorized, no buyer interaction |
+| Scheduling | Built into agreement; Vipps surfaces upcoming charges in-app | Merchant schedules and triggers each recurrence |
+| Variants | Fixed-price, variable-amount, direct charge | One model; rest is regular Order Management |
+| Pause / stop | Pause or stop the agreement | Read / update / cancel the token |
+| Failed-charge retries | Vipps applies its own retry schedule | Synchronous failure; merchant decides whether and when to retry |
+| Advance notice to buyer | In-app preview in Vipps | Not provided — merchant-owned email/SMS if required |
 
-The Vipps Recurring API uses two objects:
+**Migration of existing subscribers**: consent is bound to the original Vipps agreement and cannot be silently transferred. Build a re-consent flow that prompts the buyer to complete a Kustom checkout with `recurring: true` at the next renewal cycle. Expect some attrition.
 
-- An **agreement** is created once and accepted by the buyer in the Vipps app. The agreement declares the schedule pattern, the maximum amount, and other parameters. Variants exist for fixed-price agreements, variable-amount agreements, and direct charges.
-- A **charge** is created by the merchant for each billing event under an agreement. Charges must be created at least a couple of days before the due date so the buyer can see the upcoming payment in the Vipps app.
-
-The merchant can pause or stop the agreement, and can refund, capture, or cancel individual charges.
-
-For more information, see the [Vipps Recurring API guide](https://developer.vippsmobilepay.com/docs/APIs/recurring-api/recurring-api-guide/).
-
-#### Kustom Customer Token API
-
-Kustom uses a token-and-replay model:
-
-- On the first purchase, the merchant creates the order with `recurring: true` (and an optional `recurring_description`). When the order is completed, the response contains a `recurring_token` that the merchant stores against the customer.
-- For each subsequent recurrence, the merchant creates a new order against the token at `POST /customer-token/v1/tokens/{customer_token}/order`. The new order is created in an authorized state without buyer interaction and from that point follows the standard Order Management flow.
-
-Token status can be read and updated, and tokens can be cancelled. There is no separate scheduling primitive in Kustom — the merchant schedules and triggers each recurrence, and Kustom validates and processes it.
-
-For more information, see [Recurring / Tokenization](https://docs.kustom.co/contents/checkout/use-cases/recurring) and the [Customer Token API reference](https://docs.kustom.co/contents/api/customer-token/other/createorder).
-
-#### Migration considerations
-
-Existing Vipps Recurring agreements cannot be silently transferred to a Kustom customer token, because the buyer's consent is bound to the original agreement. Migration of subscribers typically requires a re-consent flow at the next renewal cycle, in which the buyer completes a Kustom checkout with `recurring: true` to generate a new token.
-
-Two further differences are worth flagging:
-
-- The advance-notice channel that Vipps provides in-app (where upcoming charges appear in the Vipps app) is not present in the Kustom model. If your market requires advance notice for compliance reasons, that notice becomes the merchant's responsibility through email or SMS.
-- Retry behaviour on failed charges differs. Vipps applies its own retry schedule; with Kustom, the failure is returned synchronously and the merchant decides whether and when to retry.
+References: [Vipps Recurring API guide](https://developer.vippsmobilepay.com/docs/APIs/recurring-api/recurring-api-guide/), [Kustom Recurring / Tokenization](https://docs.kustom.co/contents/checkout/use-cases/recurring), [Customer Token API](https://docs.kustom.co/contents/api/customer-token/other/createorder).
 
 ---
 
-## Appendix
+## Migration gotchas
 
-### Reference documentation
-
-#### Vipps MobilePay
-
-- [Vipps Checkout API guide](https://developer.vippsmobilepay.com/docs/APIs/checkout-api/checkout-api-guide/)
-- [Vipps Checkout API reference](https://developer.vippsmobilepay.com/api/checkout/)
-- [Vipps ePayment API — capture](https://developer.vippsmobilepay.com/docs/APIs/epayment-api/api-guide/operations/capture/)
-- [Vipps ePayment API — refund](https://developer.vippsmobilepay.com/docs/APIs/epayment-api/api-guide/operations/refund/)
-- [Vipps ePayment API — webhooks](https://developer.vippsmobilepay.com/docs/APIs/epayment-api/api-guide/webhooks/)
-- [Vipps Webhooks API guide](https://developer.vippsmobilepay.com/docs/APIs/webhooks-api/api-guide/)
-- [Vipps Recurring API guide](https://developer.vippsmobilepay.com/docs/APIs/recurring-api/recurring-api-guide/)
-- [Vipps Report API quick start](https://developer.vippsmobilepay.com/docs/APIs/report-api/report-api-quick-start/)
-- [Vipps API keys](https://developer.vippsmobilepay.com/docs/knowledge-base/api-keys/)
-
-#### Kustom
-
-- [Kustom Checkout overview](https://docs.kustom.co/contents/checkout)
-- [Kustom Checkout API reference](https://docs.kustom.co/contents/api/checkout)
-- [Create an order](https://docs.kustom.co/contents/api/checkout/other/createordermerchant)
-- [Order Management introduction](https://docs.kustom.co/contents/order-management)
-- [Order Management API reference](https://docs.kustom.co/contents/api/order-management)
-- [Capture and Track Orders](https://docs.kustom.co/contents/order-management/manage-orders-with-the-api/capture-and-track-orders)
-- [Refund Orders](https://docs.kustom.co/contents/order-management/manage-orders-with-the-api/refund-and-extend-orders)
-- [Authentication](https://docs.kustom.co/api/authentication)
-- [Recurring / Tokenization](https://docs.kustom.co/contents/checkout/use-cases/recurring)
-- [Customer Token API](https://docs.kustom.co/contents/api/customer-token/other/createorder)
-- [Settlement reports](https://docs.kustom.co/contents/order-management/settlements/settlement-reports)
-- [Hosted Kustom Checkout integration](https://docs.kustom.co/contents/checkout/hosted-payment-page/before-you-start/hpp-integration)
-erchant base, while keeping Vipps Checkout available for merchants that have not yet onboarded to Kustom. This is the phase in which the bulk of partner communication takes place — onboarding documentation, merchant-facing migration guides, and positioning.
-
-Vipps Checkout continues to service its existing payments (captures, refunds, settlements) for as long as it remains live in the merchant base.
-
-### Phase 5: subscription cutover
-
-Stop creating new Vipps Recurring agreements; new subscribers go through the Kustom customer-token flow. For existing Vipps agreements, build a re-consent flow that prompts the buyer to complete a Kustom checkout at their next renewal. Expect some attrition.
-
-If advance notice of upcoming charges was load-bearing in your market for the Vipps in-app preview, replace it with an email or SMS notification owned by the merchant.
-
-### Phase 6: sunset
-
-Once the longest refund and authorization windows have elapsed past the last Vipps order (typically six to twelve months), the Vipps webhook subscriptions can be deregistered, the credentials archived, and the Vipps Checkout integration code removed.
-
-Historical Vipps data should remain accessible in the platform's order history. Merchants will need it for accounting and dispute purposes for several years.
-
-### What to communicate to merchants
-
-Most of the change is invisible to the buyer, but a few items are not.
-
-The checkout UI changes shape. Kustom is an iframe, not a redirect, so merchants who have customised their checkout page (theming, scripts, third-party tags) need to revalidate their setup. Buyers stay on the merchant's site through the whole flow.
-
-Subscriptions require re-consent. Active Vipps Recurring subscribers cannot be silently moved. Communicate this early to subscription-heavy verticals.
-
-Order administration tooling changes underneath. If merchants administer captures and refunds from the platform's admin today, the underlying calls change. The admin UI can stay the same, but the underlying behaviour must be feature-complete before the default is switched.
-
-Line items, tax, and discounts must reconcile. Merchants with bespoke discount logic, custom tax rules, or unusual rounding may need to clean up cart data before Kustom Checkout will accept their orders.
-
-Settlement reports change. Merchants who reconcile manually need a side-by-side cheat sheet during the transition.
-
-A useful framing to lead with: Kustom is a superset rather than a replacement. Vipps and MobilePay remain available as payment methods inside Kustom Checkout, and the checkout experience moves back into the merchant's storefront as an embedded iframe.
-
----
-
-## Special use cases
-
-### Subscriptions and recurring payments
-
-The two products use different recurring models. They cannot be migrated transparently for existing subscribers.
-
-![Vipps Recurring vs Kustom Customer Token](fig-4-recurring-models.svg)
-
-#### Vipps Recurring API
-
-The Vipps Recurring API uses two objects:
-
-- An **agreement** is created once and accepted by the buyer in the Vipps app. The agreement declares the schedule pattern, the maximum amount, and other parameters. Variants exist for fixed-price agreements, variable-amount agreements, and direct charges.
-- A **charge** is created by the merchant for each billing event under an agreement. Charges must be created at least a couple of days before the due date so the buyer can see the upcoming payment in the Vipps app.
-
-The merchant can pause or stop the agreement, and can refund, capture, or cancel individual charges.
-
-For more information, see the [Vipps Recurring API guide](https://developer.vippsmobilepay.com/docs/APIs/recurring-api/recurring-api-guide/).
-
-#### Kustom Customer Token API
-
-Kustom uses a token-and-replay model:
-
-- On the first purchase, the merchant creates the order with `recurring: true` (and an optional `recurring_description`). When the order is completed, the response contains a `recurring_token` that the merchant stores against the customer.
-- For each subsequent recurrence, the merchant creates a new order against the token at `POST /customer-token/v1/tokens/{customer_token}/order`. The new order is created in an authorized state without buyer interaction and from that point follows the standard Order Management flow.
-
-Token status can be read and updated, and tokens can be cancelled. There is no separate scheduling primitive in Kustom — the merchant schedules and triggers each recurrence, and Kustom validates and processes it.
-
-For more information, see [Recurring / Tokenization](https://docs.kustom.co/contents/checkout/use-cases/recurring) and the [Customer Token API reference](https://docs.kustom.co/contents/api/customer-token/other/createorder).
-
-#### Migration considerations
-
-Existing Vipps Recurring agreements cannot be silently transferred to a Kustom customer token, because the buyer's consent is bound to the original agreement. Migration of subscribers typically requires a re-consent flow at the next renewal cycle, in which the buyer completes a Kustom checkout with `recurring: true` to generate a new token.
-
-Two further differences are worth flagging:
-
-- The advance-notice channel that Vipps provides in-app (where upcoming charges appear in the Vipps app) is not present in the Kustom model. If your market requires advance notice for compliance reasons, that notice becomes the merchant's responsibility through email or SMS.
-- Retry behaviour on failed charges differs. Vipps applies its own retry schedule; with Kustom, the failure is returned synchronously and the merchant decides whether and when to retry.
+- **Reference ≠ order id.** Assuming the Vipps `reference` is also the Kustom primary key breaks both API calls and settlement reconciliation. Use `merchant_reference1` to bridge them.
+- **Line totals must reconcile to the cent.** Cart layers with custom discount, tax, or rounding logic are the #1 source of `POST /orders` rejections.
+- **Idempotency is on you.** Without an idempotency key, a naive retry creates a duplicate capture or refund. Record intent in your DB before the call (keyed by shipment or return id) as belt-and-braces.
+- **Auth expiry isn't pushed.** Persist `expires_at` and run a job that flags orders nearing the window.
+- **Push payload is a notification, not data.** Treat both Vipps webhooks and Kustom push as triggers to refetch authoritative state. Normalise both into a single internal event type (`OrderEvent { type, externalId }`) so downstream stays unchanged.
 
 ---
 

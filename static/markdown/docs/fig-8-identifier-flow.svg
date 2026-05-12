@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg viewBox="0 0 820 420" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Identifier flow across the order lifecycle">
+  <style>
+    .t { font: 13px system-ui, -apple-system, sans-serif; fill: #1a1a1a; }
+    .h { font: 600 14px system-ui, -apple-system, sans-serif; fill: #1a1a1a; }
+    .s { font: 11px system-ui, -apple-system, sans-serif; fill: #5a5a5a; }
+    .code { font: 11px ui-monospace, SFMono-Regular, Menlo, monospace; fill: #1a1a1a; }
+    .stage { font: 600 11px system-ui, -apple-system, sans-serif; fill: #5a5a5a; text-transform: uppercase; letter-spacing: 0.04em; }
+    .lane-v { fill: #fff5f0; stroke: #ff5b24; stroke-width: 1; rx: 6; }
+    .lane-k { fill: #f3f4ff; stroke: #4f46e5; stroke-width: 1; rx: 6; }
+    .lane-m { fill: #fff; stroke: #999; stroke-width: 1; rx: 6; }
+    .pill-v { fill: #ff5b24; }
+    .pill-k { fill: #4f46e5; }
+    .pill-m { fill: #6b7280; }
+    .pill-t { font: 600 11px ui-monospace, SFMono-Regular, Menlo, monospace; fill: #fff; }
+    .tick { stroke: #d0d0d0; stroke-width: 1; stroke-dasharray: 2 3; }
+  </style>
+
+  <text x="20" y="24" class="h">How identifiers travel through the lifecycle</text>
+  <text x="20" y="42" class="s">Vipps uses one key everywhere; Kustom uses two, depending on the surface</text>
+
+  <text x="60" y="80" class="stage">Create</text>
+  <text x="220" y="80" class="stage">Authorize</text>
+  <text x="380" y="80" class="stage">Capture / Refund</text>
+  <text x="560" y="80" class="stage">Settlement</text>
+  <text x="720" y="80" class="stage">Your books</text>
+
+  <line x1="160" y1="92" x2="160" y2="400" class="tick"/>
+  <line x1="320" y1="92" x2="320" y2="400" class="tick"/>
+  <line x1="500" y1="92" x2="500" y2="400" class="tick"/>
+  <line x1="660" y1="92" x2="660" y2="400" class="tick"/>
+
+  <rect x="20" y="100" width="780" height="84" class="lane-v"/>
+  <text x="34" y="120" class="h">Vipps — reference</text>
+  <text x="34" y="136" class="s">merchant-supplied; same value everywhere</text>
+
+  <rect x="50" y="148" width="100" height="22" rx="11" class="pill-v"/>
+  <text x="100" y="163" class="pill-t" text-anchor="middle">reference</text>
+
+  <rect x="220" y="148" width="100" height="22" rx="11" class="pill-v"/>
+  <text x="270" y="163" class="pill-t" text-anchor="middle">reference</text>
+
+  <rect x="400" y="148" width="100" height="22" rx="11" class="pill-v"/>
+  <text x="450" y="163" class="pill-t" text-anchor="middle">reference</text>
+
+  <rect x="560" y="148" width="100" height="22" rx="11" class="pill-v"/>
+  <text x="610" y="163" class="pill-t" text-anchor="middle">reference</text>
+
+  <rect x="720" y="148" width="60" height="22" rx="11" class="pill-m"/>
+  <text x="750" y="163" class="pill-t" text-anchor="middle">order #</text>
+
+  <rect x="20" y="196" width="780" height="120" class="lane-k"/>
+  <text x="34" y="216" class="h">Kustom — order_id + merchant_reference1</text>
+  <text x="34" y="232" class="s">order_id keys API calls; merchant_reference1 keys settlement</text>
+
+  <rect x="50" y="244" width="100" height="22" rx="11" class="pill-k"/>
+  <text x="100" y="259" class="pill-t" text-anchor="middle">order_id</text>
+  <rect x="50" y="272" width="160" height="22" rx="11" class="pill-m"/>
+  <text x="130" y="287" class="pill-t" text-anchor="middle">merchant_reference1</text>
+
+  <rect x="220" y="244" width="100" height="22" rx="11" class="pill-k"/>
+  <text x="270" y="259" class="pill-t" text-anchor="middle">order_id</text>
+
+  <rect x="400" y="244" width="100" height="22" rx="11" class="pill-k"/>
+  <text x="450" y="259" class="pill-t" text-anchor="middle">order_id</text>
+  <text x="400" y="284" class="s">OM API path</text>
+
+  <rect x="540" y="244" width="100" height="22" rx="11" class="pill-k"/>
+  <text x="590" y="259" class="pill-t" text-anchor="middle">order_id</text>
+  <rect x="540" y="272" width="160" height="22" rx="11" class="pill-m"/>
+  <text x="620" y="287" class="pill-t" text-anchor="middle">merchant_reference1</text>
+  <text x="540" y="306" class="s">both appear in payout rows</text>
+
+  <rect x="720" y="244" width="60" height="22" rx="11" class="pill-m"/>
+  <text x="750" y="259" class="pill-t" text-anchor="middle">order #</text>
+
+  <rect x="20" y="328" width="780" height="72" class="lane-m"/>
+  <text x="34" y="348" class="h">Mapping table you maintain</text>
+  <text x="34" y="368" class="code">internal order # ↔ vipps.reference ↔ kustom.order_id ↔ kustom.merchant_reference1</text>
+  <text x="34" y="388" class="s">Set merchant_reference1 = vipps reference during parallel run so reconciliation can share a single key.</text>
+</svg>

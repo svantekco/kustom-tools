@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg viewBox="0 0 820 480" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="State propagation: Vipps webhooks vs Kustom synchronous response">
+  <style>
+    .t { font: 13px system-ui, -apple-system, sans-serif; fill: #1a1a1a; }
+    .h { font: 600 14px system-ui, -apple-system, sans-serif; fill: #1a1a1a; }
+    .s { font: 11px system-ui, -apple-system, sans-serif; fill: #5a5a5a; }
+    .actor { font: 600 12px system-ui, -apple-system, sans-serif; fill: #1a1a1a; }
+    .code { font: 11px ui-monospace, SFMono-Regular, Menlo, monospace; fill: #1a1a1a; }
+    .lane { stroke: #d0d0d0; stroke-width: 1; stroke-dasharray: 3 3; }
+    .vipps-box { fill: #fff5f0; stroke: #ff5b24; stroke-width: 1; rx: 4; }
+    .kustom-box { fill: #f3f4ff; stroke: #4f46e5; stroke-width: 1; rx: 4; }
+    .actor-box { fill: #fff; stroke: #999; stroke-width: 1; rx: 6; }
+    .req { stroke: #1a1a1a; stroke-width: 1.4; fill: none; marker-end: url(#a1); }
+    .res { stroke: #1a1a1a; stroke-width: 1.4; fill: none; marker-end: url(#a1); stroke-dasharray: 4 3; }
+    .vhook { stroke: #ff5b24; stroke-width: 1.6; fill: none; marker-end: url(#av); }
+    .kpush { stroke: #4f46e5; stroke-width: 1.6; fill: none; marker-end: url(#ak); }
+    .lbl { font: 11px system-ui, -apple-system, sans-serif; fill: #1a1a1a; }
+    .lbl-v { font: 11px system-ui, -apple-system, sans-serif; fill: #ff5b24; }
+    .lbl-k { font: 11px system-ui, -apple-system, sans-serif; fill: #4f46e5; }
+  </style>
+  <defs>
+    <marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#1a1a1a"/>
+    </marker>
+    <marker id="av" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#ff5b24"/>
+    </marker>
+    <marker id="ak" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4f46e5"/>
+    </marker>
+  </defs>
+
+  <text x="20" y="26" class="h">Vipps</text>
+  <text x="20" y="44" class="s">Signed webhooks fan out from every transition</text>
+
+  <rect x="40" y="60" width="100" height="26" class="actor-box"/>
+  <text x="90" y="78" class="actor" text-anchor="middle">Merchant</text>
+  <rect x="240" y="60" width="100" height="26" class="vipps-box"/>
+  <text x="290" y="78" class="actor" text-anchor="middle">Vipps</text>
+
+  <line x1="90" y1="86" x2="90" y2="280" class="lane"/>
+  <line x1="290" y1="86" x2="290" y2="280" class="lane"/>
+
+  <path d="M90,108 L286,108" class="req"/>
+  <text x="92" y="104" class="lbl">capture</text>
+  <path d="M290,128 L94,128" class="res"/>
+  <text x="92" y="124" class="lbl">200 OK</text>
+
+  <path d="M290,152 L94,152" class="vhook"/>
+  <text x="92" y="148" class="lbl-v">webhook: captured.v1 (signed)</text>
+
+  <path d="M290,188 L94,188" class="vhook"/>
+  <text x="92" y="184" class="lbl-v">webhook: expired.v1 (Vipps-initiated)</text>
+
+  <path d="M290,224 L94,224" class="vhook"/>
+  <text x="92" y="220" class="lbl-v">webhook: refunded.v1 (after merchant refund)</text>
+
+  <rect x="20" y="252" width="320" height="28" fill="#fff5f0" stroke="#ff5b24" stroke-width="1" stroke-dasharray="3 3" rx="6"/>
+  <text x="30" y="270" class="s">Every transition emits a self-contained signed event.</text>
+
+  <line x1="380" y1="60" x2="380" y2="460" stroke="#e5e5e5" stroke-width="1" stroke-dasharray="3 3"/>
+
+  <text x="400" y="26" class="h">Kustom</text>
+  <text x="400" y="44" class="s">State returned synchronously; push only fires when merchant wasn't the trigger</text>
+
+  <rect x="420" y="60" width="100" height="26" class="actor-box"/>
+  <text x="470" y="78" class="actor" text-anchor="middle">Merchant</text>
+  <rect x="660" y="60" width="100" height="26" class="kustom-box"/>
+  <text x="710" y="78" class="actor" text-anchor="middle">Kustom</text>
+
+  <line x1="470" y1="86" x2="470" y2="460" class="lane"/>
+  <line x1="710" y1="86" x2="710" y2="460" class="lane"/>
+
+  <path d="M470,108 L706,108" class="req"/>
+  <text x="472" y="104" class="lbl">POST .../captures</text>
+  <path d="M710,134 L474,134" class="res"/>
+  <text x="472" y="124" class="lbl">201 Created</text>
+  <text x="472" y="148" class="s">body = new state (status, totals, capture sub-resource)</text>
+
+  <text x="472" y="184" class="lbl">→ no separate event needed; merchant already has the result</text>
+
+  <path d="M710,224 L474,224" class="kpush" stroke-dasharray="3 3"/>
+  <text x="472" y="220" class="lbl-k">push: order_id (checkout_complete, buyer didn't return)</text>
+
+  <path d="M470,248 L706,248" class="req"/>
+  <text x="472" y="244" class="lbl">GET /orders/{order_id}</text>
+  <text x="472" y="262" class="s">push is a trigger to refetch, not the event payload</text>
+
+  <text x="472" y="296" class="lbl">Auth expiry → no event today; monitor expires_at proactively</text>
+
+  <rect x="400" y="320" width="360" height="60" fill="#f3f4ff" stroke="#4f46e5" stroke-width="1" stroke-dasharray="3 3" rx="6"/>
+  <text x="410" y="340" class="h">First-class webhooks in development</text>
+  <text x="410" y="358" class="s">Server-initiated transitions (auto-cancel, etc.) will become</text>
+  <text x="410" y="374" class="s">webhook events. Plan handler so both sources feed one pipeline.</text>
+
+  <rect x="20" y="396" width="320" height="64" fill="#fafafa" stroke="#eaeaea" stroke-width="1" rx="6"/>
+  <text x="30" y="416" class="h">Migration tip</text>
+  <text x="30" y="434" class="s">Normalise both into one internal event type:</text>
+  <text x="30" y="452" class="code">OrderEvent { type, externalId } → refetch authoritative state</text>
+</svg>

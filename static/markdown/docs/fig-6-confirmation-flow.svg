@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg viewBox="0 0 760 460" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Kustom confirmation page handler with push fallback">
+  <style>
+    .t { font: 13px system-ui, -apple-system, sans-serif; fill: #1a1a1a; }
+    .h { font: 600 14px system-ui, -apple-system, sans-serif; fill: #1a1a1a; }
+    .s { font: 11px system-ui, -apple-system, sans-serif; fill: #5a5a5a; }
+    .code { font: 11px ui-monospace, SFMono-Regular, Menlo, monospace; fill: #1a1a1a; }
+    .kustom { fill: #f3f4ff; stroke: #4f46e5; stroke-width: 1; rx: 6; }
+    .step { fill: #ffffff; stroke: #d0d0d0; stroke-width: 1; rx: 6; }
+    .end { fill: #ecfdf5; stroke: #059669; stroke-width: 1; rx: 6; }
+    .arrow { stroke: #999; stroke-width: 1.2; fill: none; marker-end: url(#a); }
+    .label { font: 11px system-ui, -apple-system, sans-serif; fill: #5a5a5a; }
+  </style>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#999"/>
+    </marker>
+  </defs>
+
+  <text x="20" y="28" class="h">Order reaches checkout_complete</text>
+  <text x="20" y="46" class="s">Two paths trigger the same local-order-creation logic</text>
+
+  <rect x="280" y="62" width="200" height="40" class="kustom"/>
+  <text x="380" y="80" class="t" text-anchor="middle">checkout_complete</text>
+  <text x="380" y="95" class="s" text-anchor="middle">order ready to be finalised</text>
+
+  <path d="M380,102 L200,140" class="arrow"/>
+  <path d="M380,102 L560,140" class="arrow"/>
+
+  <text x="240" y="125" class="label" text-anchor="middle">Buyer reaches confirmation</text>
+  <text x="520" y="125" class="label" text-anchor="middle">Buyer doesn't reach it</text>
+
+  <rect x="100" y="140" width="200" height="44" class="step"/>
+  <text x="200" y="158" class="t" text-anchor="middle">Browser redirect</text>
+  <text x="200" y="173" class="code" text-anchor="middle">GET {confirmation_url}</text>
+
+  <rect x="460" y="140" width="200" height="44" class="step"/>
+  <text x="560" y="158" class="t" text-anchor="middle">Server-to-server push</text>
+  <text x="560" y="173" class="code" text-anchor="middle">POST {push_url}</text>
+
+  <path d="M200,184 L200,210" class="arrow"/>
+  <path d="M560,184 L560,210" class="arrow"/>
+
+  <rect x="100" y="210" width="560" height="40" class="step"/>
+  <text x="380" y="228" class="t" text-anchor="middle">1. Fetch the order</text>
+  <text x="380" y="243" class="code" text-anchor="middle">GET /checkout/v3/orders/{order_id}  →  verify status == checkout_complete</text>
+
+  <path d="M380,250 L380,272" class="arrow"/>
+
+  <rect x="100" y="272" width="560" height="40" class="step"/>
+  <text x="380" y="290" class="t" text-anchor="middle">2. Create local order record (idempotent)</text>
+  <text x="380" y="305" class="s" text-anchor="middle">guard by order_id so confirmation + push don't both insert</text>
+
+  <path d="M380,312 L380,334" class="arrow"/>
+
+  <rect x="100" y="334" width="560" height="40" class="step"/>
+  <text x="380" y="352" class="t" text-anchor="middle">3. Acknowledge</text>
+  <text x="380" y="367" class="code" text-anchor="middle">POST /ordermanagement/v1/orders/{order_id}/acknowledge</text>
+
+  <path d="M200,374 L200,396" class="arrow"/>
+  <path d="M560,374 L560,396" class="arrow" stroke-dasharray="3 3"/>
+
+  <rect x="100" y="396" width="200" height="44" class="step"/>
+  <text x="200" y="414" class="t" text-anchor="middle">4. Render snippet</text>
+  <text x="200" y="429" class="s" text-anchor="middle">buyer sees receipt</text>
+
+  <rect x="460" y="396" width="200" height="44" class="step" stroke-dasharray="3 3"/>
+  <text x="560" y="414" class="t" text-anchor="middle">(no buyer to render to)</text>
+  <text x="560" y="429" class="s" text-anchor="middle">push path stops at acknowledge</text>
+
+  <text x="380" y="62" class="s" text-anchor="middle"></text>
+</svg>
