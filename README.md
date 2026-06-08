@@ -48,6 +48,7 @@ Loads the `html_snippet` inside the checkout iframe into a new tab. Bookmarklet 
 
 ### Get `order_id` / `session_id`
 
+Displays the order ID from the checkout iframe. Bookmarklet content can be found in [`static/getOrderId.bookmarklet.txt`](static/getOrderId.bookmarklet.txt).
 
 ## Usage
 

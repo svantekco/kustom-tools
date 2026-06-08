@@ -1,7 +1,6 @@
 var richTextContent = '❌ No Kustom checkout widget found.';
 var iframe = document.querySelector('iframe[src*="kustom.co"]');
 
-
 if (iframe) {
   var isPlayground = iframe.src.includes('playground');
   var data =
@@ -13,7 +12,6 @@ if (iframe) {
     richTextContent = `
             <h2>🛍️ Order ID</h2>
             <pre style="font-size: 20px; font-family: monospace; background-color: #f5f5f5; padding: 10px; border-radius: 5px; color: black;">${match[1]}</pre>
-
         `;
   } else {
     richTextContent = '⚠️ Issue: iframe found but could not parse order_id';
